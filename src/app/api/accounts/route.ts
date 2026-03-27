@@ -54,7 +54,11 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const data = accountSchema.parse(body)
-    const account = await prisma.account.create({ data })
+
+    const maxOrder = await prisma.account.aggregate({ _max: { sortOrder: true } })
+    const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1
+
+    const account = await prisma.account.create({ data: { ...data, sortOrder } })
     return NextResponse.json(account, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
