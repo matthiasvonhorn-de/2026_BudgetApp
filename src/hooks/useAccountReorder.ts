@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { DragEndEvent } from '@dnd-kit/core'
@@ -15,8 +15,10 @@ export function useAccountReorder(accounts: Account[]) {
   const qc = useQueryClient()
   const [isReordering, setIsReordering] = useState(false)
   const [localAccounts, setLocalAccounts] = useState<Account[]>([])
+  const snapshotRef = useRef<Account[]>([])
 
   const startReorder = useCallback(() => {
+    snapshotRef.current = [...accounts]
     setLocalAccounts([...accounts])
     setIsReordering(true)
   }, [accounts])
@@ -42,14 +44,15 @@ export function useAccountReorder(accounts: Account[]) {
       toast.success('Reihenfolge gespeichert')
     },
     onError: () => {
-      setLocalAccounts([...accounts])
+      setLocalAccounts(snapshotRef.current)
       toast.error('Fehler beim Speichern der Reihenfolge')
     },
   })
 
   const saveReorder = useCallback(() => {
     reorderMutation.mutate(localAccounts.map(a => a.id))
-  }, [localAccounts, reorderMutation])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localAccounts])
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
