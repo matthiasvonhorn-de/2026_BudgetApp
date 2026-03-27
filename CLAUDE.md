@@ -65,6 +65,10 @@ src/hooks/              # Custom React hooks
 - **New dialogs/modals**: Standalone components in `src/components/[feature]/`.
 - **Path alias**: `@/*` → `src/*`.
 
+## Development Process
+
+Spec-driven development: before any implementation, first work out a specification and save it to `docs/superpowers/specs/`. Only start implementation after the user has approved the spec.
+
 ## Critical gotchas
 
 - `prisma migrate dev` **does not work** with the libSQL adapter — use manual SQL + `prisma generate`.
