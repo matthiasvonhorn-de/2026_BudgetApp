@@ -19,7 +19,7 @@ export async function GET() {
       include: {
         _count: { select: { transactions: true } },
       },
-      orderBy: { name: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     })
 
     // Internal allocations should NOT affect the physical account balance:
