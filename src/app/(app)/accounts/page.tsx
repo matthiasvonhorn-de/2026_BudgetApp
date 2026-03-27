@@ -1,26 +1,52 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { AccountCard } from '@/components/accounts/AccountCard'
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
+import { SortableAccountCard } from '@/components/accounts/SortableAccountCard'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useAccountReorder } from '@/hooks/useAccountReorder'
+import { Button } from '@/components/ui/button'
 
 export default function AccountsPage() {
   const fmt = useFormatCurrency()
+  const sensors = useSensors(useSensor(PointerSensor))
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
 
-  const totalBalance = accounts.reduce((sum: number, a: any) => sum + a.currentBalance, 0)
+  const { isReordering, localAccounts, startReorder, cancelReorder, saveReorder, handleDragEnd, isSaving } =
+    useAccountReorder(accounts)
+
+  const totalBalance = localAccounts.reduce((sum: number, a: any) => sum + a.currentBalance, 0)
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Konten</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Gesamtvermögen: <span className="font-semibold text-foreground">{fmt(totalBalance)}</span>
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Konten</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Gesamtvermögen: <span className="font-semibold text-foreground">{fmt(totalBalance)}</span>
+          </p>
+        </div>
+        {!isLoading && accounts.length > 1 && (
+          isReordering ? (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={cancelReorder} disabled={isSaving}>
+                Abbrechen
+              </Button>
+              <Button size="sm" onClick={saveReorder} disabled={isSaving}>
+                {isSaving ? 'Speichern...' : 'Speichern'}
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={startReorder}>
+              Reihenfolge bearbeiten
+            </Button>
+          )
+        )}
       </div>
 
       {isLoading ? (
@@ -35,11 +61,15 @@ export default function AccountsPage() {
           <p className="text-sm mt-1">Konten können unter Einstellungen → Allgemein hinzugefügt werden.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {accounts.map((account: any) => (
-            <AccountCard key={account.id} account={account} />
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={localAccounts.map((a: any) => a.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {localAccounts.map((account: any) => (
+                <SortableAccountCard key={account.id} account={account} isReordering={isReordering} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   )
