@@ -1,0 +1,281 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Account {
+  id             String           @id @default(cuid())
+  name           String
+  iban           String?          @unique
+  bank           String?
+  type           AccountType      @default(CHECKING)
+  color          String           @default("#6366f1")
+  icon           String?
+  currentBalance Float            @default(0)
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  transactions    Transaction[]
+  reconciliations Reconciliation[]
+  subAccounts     SubAccount[]
+  categoryGroups  CategoryGroup[]
+  loans           Loan[]
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CREDIT_CARD
+  CASH
+  INVESTMENT
+}
+
+model CategoryGroup {
+  id         String   @id @default(cuid())
+  name       String
+  sortOrder  Int      @default(0)
+  accountId  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  account    Account    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categories Category[]
+
+  @@index([accountId])
+}
+
+model Category {
+  id                 String        @id @default(cuid())
+  name               String
+  color              String        @default("#6366f1")
+  icon               String?
+  type               CategoryType  @default(EXPENSE)
+  groupId            String?
+  sortOrder          Int           @default(0)
+  isActive           Boolean       @default(true)
+  subAccountGroupId   String?
+  subAccountLinkType  String   @default("BOOKING")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  group            CategoryGroup?   @relation(fields: [groupId], references: [id])
+  subAccountGroup  SubAccountGroup? @relation(fields: [subAccountGroupId], references: [id])
+  transactions     Transaction[]
+  budgetEntries    BudgetEntry[]
+  rules            CategoryRule[]
+  loans            Loan[]
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+model Transaction {
+  id                  String            @id @default(cuid())
+  date                DateTime
+  amount              Float
+  description         String
+  payee               String?
+  notes               String?
+  accountId           String
+  categoryId          String?
+  status              TransactionStatus @default(PENDING)
+  type                TransactionType   @default(EXPENSE)
+  importHash          String?           @unique
+  isReconciled        Boolean           @default(false)
+  subAccountEntryId   String?           @unique
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  account           Account            @relation(fields: [accountId], references: [id])
+  category          Category?          @relation(fields: [categoryId], references: [id])
+  subAccountEntry   SubAccountEntry?   @relation(fields: [subAccountEntryId], references: [id])
+
+  transferToId   String?       @unique
+  transferTo     Transaction?  @relation("TransferPair", fields: [transferToId], references: [id])
+  transferFrom   Transaction?  @relation("TransferPair")
+
+  @@index([accountId])
+  @@index([categoryId])
+  @@index([date])
+}
+
+enum TransactionStatus {
+  PENDING
+  CLEARED
+  RECONCILED
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+model BudgetEntry {
+  id         String   @id @default(cuid())
+  categoryId String
+  month      Int
+  year       Int
+  budgeted   Float    @default(0)
+  rolledOver Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([categoryId, month, year])
+  @@index([year, month])
+}
+
+model Reconciliation {
+  id               String   @id @default(cuid())
+  accountId        String
+  date             DateTime
+  statementBalance Float
+  clearedBalance   Float
+  difference       Float
+  createdAt        DateTime @default(now())
+
+  account          Account  @relation(fields: [accountId], references: [id])
+}
+
+model CategoryRule {
+  id         String       @id @default(cuid())
+  name       String
+  field      RuleField
+  operator   RuleOperator
+  value      String
+  categoryId String
+  priority   Int          @default(0)
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  category   Category     @relation(fields: [categoryId], references: [id])
+}
+
+enum RuleField {
+  DESCRIPTION
+  PAYEE
+  AMOUNT
+}
+
+enum RuleOperator {
+  CONTAINS
+  STARTS_WITH
+  ENDS_WITH
+  EQUALS
+  GREATER_THAN
+  LESS_THAN
+  REGEX
+}
+
+model SubAccount {
+  id             String   @id @default(cuid())
+  name           String
+  accountId      String
+  color          String   @default("#6366f1")
+  initialBalance Float    @default(0)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  account Account          @relation(fields: [accountId], references: [id])
+  groups  SubAccountGroup[]
+
+  @@index([accountId])
+}
+
+model SubAccountGroup {
+  id             String   @id @default(cuid())
+  name           String
+  subAccountId   String
+  initialBalance Float    @default(0)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  subAccount         SubAccount        @relation(fields: [subAccountId], references: [id])
+  entries            SubAccountEntry[]
+  linkedCategories   Category[]
+}
+
+model SubAccountEntry {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  description String
+  amount      Float
+  fromBudget  Boolean  @default(false)
+  groupId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  group       SubAccountGroup  @relation(fields: [groupId], references: [id])
+  transaction Transaction?
+}
+
+// loanType: "ANNUITAETENDARLEHEN" | "RATENKREDIT"
+model Loan {
+  id             String        @id @default(cuid())
+  name           String
+  loanType       String        @default("ANNUITAETENDARLEHEN")
+  principal      Float
+  interestRate   Float         // Jährlicher Zinssatz z.B. 0.035 für 3,5%
+  termMonths     Int
+  startDate      DateTime
+  monthlyPayment        Float         // Monatliche Rate (berechnet)
+  initialRepaymentRate  Float         @default(0)
+  accountId             String?
+  categoryId            String?       // Kategorie für gebuchte Kreditraten-Transaktionen
+  notes          String?
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  account        Account?      @relation(fields: [accountId], references: [id])
+  category       Category?     @relation(fields: [categoryId], references: [id])
+  payments       LoanPayment[]
+
+  @@index([accountId])
+}
+
+model LoanPayment {
+  id                 String    @id @default(cuid())
+  loanId             String
+  periodNumber       Int
+  dueDate            DateTime
+  scheduledPrincipal Float
+  scheduledInterest  Float
+  scheduledBalance   Float
+  extraPayment       Float     @default(0)
+  paidAt             DateTime?
+  transactionId      String?   @unique  // gebuchte Transaktion auf verknüpftem Konto
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  loan               Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@unique([loanId, periodNumber])
+  @@index([loanId])
+}
+
+model CsvProfile {
+  id            String   @id @default(cuid())
+  name          String
+  delimiter     String   @default(";")
+  dateFormat    String   @default("DD.MM.YYYY")
+  encoding      String   @default("UTF-8")
+  skipRows      Int      @default(0)
+  columnMapping String
+  amountFormat  String   @default("DE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

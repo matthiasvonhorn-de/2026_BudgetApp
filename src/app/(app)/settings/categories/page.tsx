@@ -1,0 +1,63 @@
+'use client'
+
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { CategoryGroupManagerContent } from '@/components/accounts/AccountBudgetConfig'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+interface Account {
+  id: string
+  name: string
+  color: string
+}
+
+export default function CategoriesSettingsPage() {
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
+
+  const { data: accounts = [] } = useQuery<Account[]>({
+    queryKey: ['accounts'],
+    queryFn: () => fetch('/api/accounts').then(r => r.json()),
+  })
+
+  const accountId = selectedAccountId ?? accounts[0]?.id ?? null
+
+  return (
+    <div className="p-6 max-w-2xl space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold">Kategorien & Gruppen</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Gruppen und Kategorien sind pro Konto konfigurierbar.
+        </p>
+      </div>
+
+      <div className="space-y-1">
+        <p className="text-sm font-medium">Konto</p>
+        <Select
+          value={accountId ?? ''}
+          onValueChange={v => setSelectedAccountId(v)}
+          items={accounts.map(a => ({ value: a.id, label: a.name }))}
+        >
+          <SelectTrigger className="w-64">
+            <SelectValue placeholder="Konto wählen…" />
+          </SelectTrigger>
+          <SelectContent>
+            {accounts.map(a => (
+              <SelectItem key={a.id} value={a.id}>
+                <span className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: a.color }} />
+                  {a.name}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {accountId ? (
+        <CategoryGroupManagerContent accountId={accountId} />
+      ) : (
+        <p className="text-sm text-muted-foreground">Kein Konto vorhanden.</p>
+      )}
+    </div>
+  )
+}

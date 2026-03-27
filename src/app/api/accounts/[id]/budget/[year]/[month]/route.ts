@@ -1,0 +1,100 @@
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+
+export async function GET(
+  _: Request,
+  { params }: { params: Promise<{ id: string; year: string; month: string }> },
+) {
+  const { id, year: yearStr, month: monthStr } = await params
+  const year = parseInt(yearStr)
+  const month = parseInt(monthStr)
+
+  const startOfMonth = new Date(year, month - 1, 1)
+  const endOfMonth = new Date(year, month, 0, 23, 59, 59)
+
+  try {
+    const account = await prisma.account.findUnique({ where: { id } })
+    if (!account) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    // Anfangskontostand: aktueller Saldo minus alle Transaktionen ab Monatsbeginn
+    const fromMonthStart = await prisma.transaction.aggregate({
+      where: { accountId: id, date: { gte: startOfMonth } },
+      _sum: { amount: true },
+    })
+    const openingBalance = account.currentBalance - (fromMonthStart._sum.amount ?? 0)
+
+    // Nur Gruppen dieses Kontos laden
+    const allGroups = await prisma.categoryGroup.findMany({
+      where: { accountId: id },
+      include: {
+        categories: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+      orderBy: { sortOrder: 'asc' },
+    })
+
+    // Budget-Einträge für diesen Monat
+    const budgetEntries = await prisma.budgetEntry.findMany({ where: { year, month } })
+    const budgetMap = new Map(budgetEntries.map(e => [e.categoryId, e]))
+
+    // Ist-Werte pro Kategorie — nur Transaktionen dieses Kontos
+    const activities = await prisma.transaction.groupBy({
+      by: ['categoryId'],
+      where: {
+        accountId: id,
+        date: { gte: startOfMonth, lte: endOfMonth },
+        categoryId: { not: null },
+      },
+      _sum: { amount: true },
+    })
+    const activityMap = new Map(activities.map(a => [a.categoryId!, a._sum.amount ?? 0]))
+
+    // Daten zusammenführen
+    const groups = allGroups
+      .filter(g => g.categories.length > 0)
+      .map(group => ({
+        id: group.id,
+        name: group.name,
+        categories: group.categories.map(cat => {
+          const entry = budgetMap.get(cat.id)
+          const budgeted = entry?.budgeted ?? 0
+          const rolledOver = entry?.rolledOver ?? 0
+          const activity = activityMap.get(cat.id) ?? 0
+          const available = rolledOver + activity - budgeted
+          return {
+            id: cat.id,
+            name: cat.name,
+            color: cat.color,
+            type: cat.type,
+            budgeted,
+            rolledOver,
+            activity,
+            available,
+          }
+        }),
+      }))
+
+    const allCats = groups.flatMap(g => g.categories)
+    const totalBudgeted = allCats.reduce((s, c) => s + c.budgeted, 0)
+    const totalActivity = allCats.reduce((s, c) => s + c.activity, 0)
+
+    return NextResponse.json({
+      account,
+      year,
+      month,
+      openingBalance,
+      groups,
+      summary: {
+        totalBudgeted,
+        totalActivity,
+        closingBalancePlan: openingBalance + totalBudgeted,
+        closingBalanceActual: openingBalance + totalActivity,
+      },
+    })
+  } catch (e) {
+    console.error(e)
+    return NextResponse.json({ error: 'Fehler beim Laden' }, { status: 500 })
+  }
+}

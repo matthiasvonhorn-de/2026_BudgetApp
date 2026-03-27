@@ -1,0 +1,96 @@
+{
+  "name": "budget-app-temp",
+  "version": "0.1.0",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "node node_modules/next/dist/bin/next dev",
+    "build": "node node_modules/next/dist/bin/next build",
+    "start": "node node_modules/next/dist/bin/next start",
+    "lint": "eslint",
+    "electron:dev": "electron .",
+    "electron:build": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac zip",
+    "electron:build:dir": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.family.budgetapp",
+    "productName": "BudgetApp",
+    "copyright": "Persönliche Budget-App",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/main.js"
+    ],
+    "extraResources": [
+      {
+        "from": "prisma/dev.db",
+        "to": "db/budget.db"
+      }
+    ],
+    "afterPack": "scripts/after-pack.js",
+    "mac": {
+      "category": "public.app-category.finance",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null,
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    }
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@base-ui/react": "^1.3.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@hookform/resolvers": "^5.2.2",
+    "@libsql/client": "^0.17.0",
+    "@prisma/adapter-libsql": "^7.5.0",
+    "@prisma/client": "^7.5.0",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tailwindcss/postcss": "^4",
+    "@tanstack/react-query": "^5.90.21",
+    "@tanstack/react-query-devtools": "^5.91.3",
+    "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "docx": "^9.6.1",
+    "electron": "^41.0.2",
+    "electron-builder": "^26.8.1",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "lucide-react": "^0.577.0",
+    "next": "^16.1.6",
+    "next-themes": "^0.4.6",
+    "papaparse": "^5.5.3",
+    "prisma": "^7.5.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-hook-form": "^7.71.2",
+    "recharts": "^3.8.0",
+    "shadcn": "^4.0.6",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.11"
+  }
+}
