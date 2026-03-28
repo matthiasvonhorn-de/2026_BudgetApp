@@ -41,6 +41,7 @@ interface AccountBudgetData {
   year: number
   month: number
   openingBalance: number
+  subAccountsBalance: number
   groups: GroupData[]
   summary: {
     totalBudgeted: number
@@ -341,6 +342,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
   }
 
   const opening = data?.openingBalance ?? 0
+  const subAccountsBalance = data?.subAccountsBalance ?? 0
   const groups = data?.groups ?? []
   const summary = data?.summary
   const closingPlan = summary?.closingBalancePlan ?? opening
