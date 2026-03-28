@@ -473,6 +473,27 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
           </thead>
 
           <tbody>
+            {/* ── Saldoübertrag aus Vormonat ─────────────────────────── */}
+            <tr className="bg-slate-100 dark:bg-slate-800/50 font-semibold">
+              <td className="px-3 py-1.5 border border-border text-xs text-muted-foreground">
+                {`01.${String(budgetMonth).padStart(2, '0')}.${budgetYear}`}
+              </td>
+              <td className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Saldoübertrag aus Vormonat
+              </td>
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening)}`}>
+                {fmt(opening)}
+              </td>
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening)}`}>
+                {fmt(opening)}
+              </td>
+              <td className="px-3 py-1.5 border border-border text-right tabular-nums text-muted-foreground">
+                {fmt(0)}
+              </td>
+              <td className="px-3 py-1.5 border border-border" />
+            </tr>
+
+            {/* ── Kategoriegruppen ──────────────────────────────────── */}
             {groups.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">
