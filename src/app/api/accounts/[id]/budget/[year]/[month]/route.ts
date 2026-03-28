@@ -81,16 +81,25 @@ export async function GET(
     const totalActivity = allCats.reduce((s, c) => s + c.activity, 0)
 
     // Sub-Account-Saldo bis Monatsende (Zeit-Reise-korrekt)
-    const subAccountEntries = await prisma.subAccountEntry.aggregate({
-      where: {
-        date: { lte: endOfMonth },
-        group: {
-          subAccount: { accountId: id },
+    // Spiegelt die Berechnung in SubAccountsSection: sub.initialBalance + group.initialBalance + Σ(entries)
+    const subAccountsData = await prisma.subAccount.findMany({
+      where: { accountId: id },
+      include: {
+        groups: {
+          include: {
+            entries: {
+              where: { date: { lte: endOfMonth } },
+              select: { amount: true },
+            },
+          },
         },
       },
-      _sum: { amount: true },
     })
-    const subAccountsBalance = subAccountEntries._sum.amount ?? 0
+    const subAccountsBalance = subAccountsData.reduce((total, sa) =>
+      total + sa.initialBalance + sa.groups.reduce((gTotal, g) =>
+        gTotal + g.initialBalance + g.entries.reduce((eTotal, e) => eTotal + e.amount, 0)
+      , 0)
+    , 0)
 
     return NextResponse.json({
       account,
