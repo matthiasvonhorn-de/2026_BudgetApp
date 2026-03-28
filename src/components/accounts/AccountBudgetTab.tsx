@@ -640,11 +640,11 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               <td colSpan={2} className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Ausgaben
               </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(expensePlan)}`}>
-                {fmt(expensePlan)}
+              <td className="px-3 py-1.5 border border-border text-right tabular-nums text-muted-foreground">
+                {fmt(Math.abs(expensePlan))}
               </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(expenseActual)}`}>
-                {fmt(expenseActual)}
+              <td className="px-3 py-1.5 border border-border text-right tabular-nums text-muted-foreground">
+                {fmt(Math.abs(expenseActual))}
               </td>
               <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(expenseActual - expensePlan)}`}>
                 {fmt(expenseActual - expensePlan)}
