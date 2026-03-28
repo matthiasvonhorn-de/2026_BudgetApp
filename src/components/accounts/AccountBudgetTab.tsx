@@ -41,6 +41,7 @@ interface AccountBudgetData {
   year: number
   month: number
   openingBalance: number
+  subAccountsBalance: number
   groups: GroupData[]
   summary: {
     totalBudgeted: number
@@ -341,6 +342,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
   }
 
   const opening = data?.openingBalance ?? 0
+  const subAccountsBalance = data?.subAccountsBalance ?? 0
   const groups = data?.groups ?? []
   const summary = data?.summary
   const closingPlan = summary?.closingBalancePlan ?? opening
@@ -349,18 +351,12 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
 
   // Sub-Accounts dieses Kontos
   const subAccounts = (subAccountsData?.subAccounts ?? []).filter(sa => sa.accountId === accountId)
-  const subAccountsTotal = subAccounts.reduce((s, sa) => s + sa.balance, 0)
 
-  // Einnahmen / Ausgaben aufschlüsseln
   const allCats = groups.flatMap(g => g.categories)
-  const incomePlan   = allCats.filter(c => c.type === 'INCOME').reduce((s, c) => s + c.budgeted, 0)
+  const incomePlan = allCats.filter(c => c.type === 'INCOME').reduce((s, c) => s + c.budgeted, 0)
   const incomeActual = allCats.filter(c => c.type === 'INCOME').reduce((s, c) => s + c.activity, 0)
-  const expensePlan   = allCats.filter(c => c.type === 'EXPENSE').reduce((s, c) => s + c.budgeted, 0)
+  const expensePlan = allCats.filter(c => c.type === 'EXPENSE').reduce((s, c) => s + c.budgeted, 0)
   const expenseActual = allCats.filter(c => c.type === 'EXPENSE').reduce((s, c) => s + c.activity, 0)
-
-  // Nettoveränderung dieses Monats (Einnahmen + Ausgaben, Ausgaben sind negativ)
-  const netPlan   = summary?.totalBudgeted ?? 0
-  const netActual = summary?.totalActivity ?? 0
 
   return (
     <div className="flex flex-col">
@@ -409,117 +405,59 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               </td>
             </tr>
 
-            {/* ── 1. Nettoveränderung ───────────────────────────────────── */}
+            {/* ── 1. Gesamtsaldo ───────────────────────────────────── */}
             <tr className="bg-blue-100/80 dark:bg-blue-900/30 font-bold">
               <td colSpan={2} className="px-3 py-1 border border-border text-right text-xs font-bold text-foreground">
-                Nettoveränderung
+                Gesamtsaldo
               </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(netPlan)}`}>
-                {fmt(netPlan)}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(closingPlan)}`}>
+                {fmt(closingPlan)}
               </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(netActual)}`}>
-                {fmt(netActual)}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(closingActual)}`}>
+                {fmt(closingActual)}
               </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(netActual - netPlan)}`}>
-                {fmt(netActual - netPlan)}
-              </td>
-              <td className="px-3 py-1 border border-border" />
-            </tr>
-
-            {/* ── 2. Einnahmen ──────────────────────────────────────────── */}
-            <tr className="bg-blue-50/70 dark:bg-blue-950/25">
-              <td className="px-3 py-1 border border-border" />
-              <td className="px-3 py-1 border border-border text-right text-xs font-semibold text-muted-foreground">
-                Einnahmen
-              </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(incomePlan)}`}>
-                {fmt(incomePlan)}
-              </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(incomeActual)}`}>
-                {fmt(incomeActual)}
-              </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(incomeActual - incomePlan)}`}>
-                {fmt(incomeActual - incomePlan)}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(closingActual - closingPlan)}`}>
+                {fmt(closingActual - closingPlan)}
               </td>
               <td className="px-3 py-1 border border-border" />
             </tr>
 
-            {/* ── 3. Ausgaben ───────────────────────────────────────────── */}
-            <tr className="bg-blue-50/70 dark:bg-blue-950/25">
-              <td className="px-3 py-1 border border-border" />
-              <td className="px-3 py-1 border border-border text-right text-xs font-semibold text-muted-foreground">
-                Ausgaben
-              </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(expensePlan)}`}>
-                {fmt(expensePlan)}
-              </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(expenseActual)}`}>
-                {fmt(expenseActual)}
-              </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(expenseActual - expensePlan)}`}>
-                {fmt(expenseActual - expensePlan)}
-              </td>
-              <td className="px-3 py-1 border border-border" />
-            </tr>
-
-            {/* ── 4. Unterkonten (falls vorhanden) ──────────────────────── */}
-            {subAccounts.length > 0 && (
-              <>
-                <tr className="bg-blue-50/70 dark:bg-blue-950/25">
-                  <td className="px-3 py-1 border border-border" />
-                  <td className="px-3 py-1 border border-border text-right text-xs font-semibold text-muted-foreground">
-                    Summe Unterkonten
-                  </td>
-                  <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(subAccountsTotal)}`}>
-                    {fmt(subAccountsTotal)}
-                  </td>
-                  <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(subAccountsTotal)}`}>
-                    {fmt(subAccountsTotal)}
-                  </td>
-                  <td className="px-3 py-1 border border-border text-right text-xs text-muted-foreground tabular-nums">
-                    {fmt(0)}
-                  </td>
-                  <td className="px-3 py-1 border border-border" />
-                </tr>
-                {subAccounts.map(sa => (
-                  <tr key={sa.id} className="bg-blue-50/40 dark:bg-blue-950/15">
-                    <td className="px-3 py-1 border border-border" />
-                    <td className="px-3 py-1 border border-border pl-10">
-                      <div className="flex items-center gap-1.5 justify-end">
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: sa.color }} />
-                        <span className="text-xs text-muted-foreground">{sa.name}</span>
-                      </div>
-                    </td>
-                    <td className={`px-3 py-1 border border-border text-right tabular-nums text-xs ${amountColor(sa.balance)}`}>
-                      {fmt(sa.balance)}
-                    </td>
-                    <td className={`px-3 py-1 border border-border text-right tabular-nums text-xs ${amountColor(sa.balance)}`}>
-                      {fmt(sa.balance)}
-                    </td>
-                    <td className="px-3 py-1 border border-border text-right text-xs text-muted-foreground tabular-nums">
-                      {fmt(0)}
-                    </td>
-                    <td className="px-3 py-1 border border-border" />
-                  </tr>
-                ))}
-              </>
+            {/* ── 2. Saldo Unterkonten (nur wenn vorhanden) ─────────── */}
+            {subAccountsBalance !== 0 && (
+              <tr className="bg-blue-50/70 dark:bg-blue-950/25">
+                <td className="px-3 py-1 border border-border" />
+                <td className="px-3 py-1 border border-border text-right text-xs font-semibold text-muted-foreground">
+                  Saldo Unterkonten
+                </td>
+                <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(subAccountsBalance)}`}>
+                  {fmt(subAccountsBalance)}
+                </td>
+                <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(subAccountsBalance)}`}>
+                  {fmt(subAccountsBalance)}
+                </td>
+                <td className="px-3 py-1 border border-border text-right text-xs text-muted-foreground tabular-nums">
+                  {fmt(0)}
+                </td>
+                <td className="px-3 py-1 border border-border" />
+              </tr>
             )}
 
-            {/* ── Anfangskontostand (vor den Spaltenköpfen) ─────────────── */}
-            <tr className="bg-slate-100 dark:bg-slate-800/50 font-semibold">
-              <td colSpan={2} className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Anfangskontostand
+            {/* ── 3. Saldo Hauptkonto ───────────────────────────────── */}
+            <tr className="bg-blue-50/70 dark:bg-blue-950/25">
+              <td className="px-3 py-1 border border-border" />
+              <td className="px-3 py-1 border border-border text-right text-xs font-semibold text-muted-foreground">
+                Saldo Hauptkonto
               </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening)}`}>
-                {fmt(opening)}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingPlan - subAccountsBalance)}`}>
+                {fmt(closingPlan - subAccountsBalance)}
               </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening)}`}>
-                {fmt(opening)}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingActual - subAccountsBalance)}`}>
+                {fmt(closingActual - subAccountsBalance)}
               </td>
-              <td className="px-3 py-1.5 border border-border text-right tabular-nums text-muted-foreground">
-                {fmt(0)}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingActual - closingPlan)}`}>
+                {fmt(closingActual - closingPlan)}
               </td>
-              <td className="px-3 py-1.5 border border-border" />
+              <td className="px-3 py-1 border border-border" />
             </tr>
 
             {/* ── Spaltenköpfe ──────────────────────────────────────────── */}
@@ -534,6 +472,27 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
           </thead>
 
           <tbody>
+            {/* ── Saldoübertrag aus Vormonat ─────────────────────────── */}
+            <tr className="bg-slate-100 dark:bg-slate-800/50 font-semibold">
+              <td className="px-3 py-1.5 border border-border text-xs text-muted-foreground">
+                {`01.${String(budgetMonth).padStart(2, '0')}.${budgetYear}`}
+              </td>
+              <td className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Saldoübertrag aus Vormonat
+              </td>
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening)}`}>
+                {fmt(opening)}
+              </td>
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening)}`}>
+                {fmt(opening)}
+              </td>
+              <td className="px-3 py-1.5 border border-border text-right tabular-nums text-muted-foreground">
+                {fmt(0)}
+              </td>
+              <td className="px-3 py-1.5 border border-border" />
+            </tr>
+
+            {/* ── Kategoriegruppen ──────────────────────────────────── */}
             {groups.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">
@@ -659,20 +618,36 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
             )}
           </tbody>
 
-          {/* ── Endkontostand ────────────────────────────────────────────── */}
           <tfoot>
+            {/* ── Einnahmen ────────────────────────────────────── */}
             <tr className="bg-slate-100 dark:bg-slate-800/50 font-semibold border-t-2 border-border">
               <td colSpan={2} className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Endkontostand
+                Einnahmen
               </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(closingPlan)}`}>
-                {fmt(closingPlan)}
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(incomePlan)}`}>
+                {fmt(incomePlan)}
               </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(closingActual)}`}>
-                {fmt(closingActual)}
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(incomeActual)}`}>
+                {fmt(incomeActual)}
               </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(closingActual - closingPlan)}`}>
-                {fmt(closingActual - closingPlan)}
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(incomeActual - incomePlan)}`}>
+                {fmt(incomeActual - incomePlan)}
+              </td>
+              <td className="px-3 py-1.5 border border-border" />
+            </tr>
+            {/* ── Ausgaben ─────────────────────────────────────── */}
+            <tr className="bg-slate-100 dark:bg-slate-800/50 font-semibold">
+              <td colSpan={2} className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Ausgaben
+              </td>
+              <td className="px-3 py-1.5 border border-border text-right tabular-nums text-muted-foreground">
+                {fmt(Math.abs(expensePlan))}
+              </td>
+              <td className="px-3 py-1.5 border border-border text-right tabular-nums text-muted-foreground">
+                {fmt(Math.abs(expenseActual))}
+              </td>
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(expenseActual - expensePlan)}`}>
+                {fmt(expenseActual - expensePlan)}
               </td>
               <td className="px-3 py-1.5 border border-border" />
             </tr>
