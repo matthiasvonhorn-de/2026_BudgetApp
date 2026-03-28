@@ -352,6 +352,13 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
   // Sub-Accounts dieses Kontos
   const subAccounts = (subAccountsData?.subAccounts ?? []).filter(sa => sa.accountId === accountId)
 
+  // Income/Expense calculations for Task 5 (tfoot rows)
+  const allCats = groups.flatMap(g => g.categories)
+  const incomePlan = allCats.filter(c => c.type === 'INCOME').reduce((s, c) => s + c.budgeted, 0)
+  const incomeActual = allCats.filter(c => c.type === 'INCOME').reduce((s, c) => s + c.activity, 0)
+  const expensePlan = allCats.filter(c => c.type === 'EXPENSE').reduce((s, c) => s + c.budgeted, 0)
+  const expenseActual = allCats.filter(c => c.type === 'EXPENSE').reduce((s, c) => s + c.activity, 0)
+
   return (
     <div className="flex flex-col">
       {/* Monat-Navigation */}
