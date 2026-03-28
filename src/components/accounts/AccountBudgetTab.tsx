@@ -424,7 +424,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
             </tr>
 
             {/* ── 2. Saldo Unterkonten (nur wenn vorhanden) ─────────── */}
-            {subAccounts.length > 0 && (
+            {subAccountsBalance !== 0 && (
               <tr className="bg-blue-50/70 dark:bg-blue-950/25">
                 <td className="px-3 py-1 border border-border" />
                 <td className="px-3 py-1 border border-border text-right text-xs font-semibold text-muted-foreground">
@@ -455,8 +455,8 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingActual - subAccountsBalance)}`}>
                 {fmt(closingActual - subAccountsBalance)}
               </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor((closingActual - subAccountsBalance) - (closingPlan - subAccountsBalance))}`}>
-                {fmt((closingActual - subAccountsBalance) - (closingPlan - subAccountsBalance))}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingActual - closingPlan)}`}>
+                {fmt(closingActual - closingPlan)}
               </td>
               <td className="px-3 py-1 border border-border" />
             </tr>
