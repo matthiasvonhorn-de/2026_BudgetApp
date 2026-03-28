@@ -80,10 +80,10 @@ function LoanDialog({
     enabled: open,
   })
 
-  const { data: categoryData } = useQuery<{ groups: { id: string; name: string; categories: { id: string; name: string; color: string }[] }[] }>({
-    queryKey: ['categories'],
-    queryFn: () => fetch('/api/categories').then(r => r.json()),
-    enabled: open,
+  const { data: accountCategories = [] } = useQuery<{ id: string; name: string; categories: { id: string; name: string; color: string }[] }[]>({
+    queryKey: ['account-category-groups', form.accountId],
+    queryFn: () => fetch(`/api/accounts/${form.accountId}/category-groups`).then(r => r.json()),
+    enabled: open && !!form.accountId,
   })
 
   const set = (k: keyof LoanForm, v: string) => setForm(f => ({ ...f, [k]: v }))
@@ -245,7 +245,7 @@ function LoanDialog({
               <Label>Verknüpftes Konto</Label>
               <Select
                 value={form.accountId}
-                onValueChange={(v: string | null) => set('accountId', v ?? '')}
+                onValueChange={(v: string | null) => { set('accountId', v ?? ''); set('categoryId', '') }}
                 items={accounts.map((a: any) => ({ value: a.id, label: a.name }))}
               >
                 <SelectTrigger>
@@ -263,14 +263,15 @@ function LoanDialog({
               <Select
                 value={form.categoryId}
                 onValueChange={(v: string | null) => set('categoryId', v ?? '')}
-                items={categoryData?.groups.flatMap((g: any) => g.categories.map((c: any) => ({ value: c.id, label: c.name }))) ?? []}
+                disabled={!form.accountId}
+                items={accountCategories.flatMap(g => g.categories.map(c => ({ value: c.id, label: c.name })))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Kategorie wählen (optional)" />
+                  <SelectValue placeholder={form.accountId ? 'Kategorie wählen (optional)' : 'Zuerst Konto wählen'} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Keine Kategorie</SelectItem>
-                  {categoryData?.groups.map(group => (
+                  {accountCategories.map(group => (
                     <div key={group.id}>
                       <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{group.name}</div>
                       {group.categories.map(cat => (
