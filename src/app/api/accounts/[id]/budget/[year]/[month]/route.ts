@@ -16,25 +16,12 @@ export async function GET(
     const account = await prisma.account.findUnique({ where: { id } })
     if (!account) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Korrigierter Kontostand: interne Buchungen (Transfer/Unterkonto) herausrechnen
-    // — spiegelt die gleiche Logik wie accounts/[id]/route.ts
-    const internalEffect = await prisma.transaction.aggregate({
+    // Saldoübertrag aus Vormonat: Summe aller echten Transaktionen vor Monatsbeginn
+    // (TRANSFER und Unterkonto-Buchungen bleiben außen vor, da intern)
+    const openingResult = await prisma.transaction.aggregate({
       where: {
         accountId: id,
-        OR: [
-          { type: 'TRANSFER' },
-          { type: 'EXPENSE', subAccountEntryId: { not: null } },
-        ],
-      },
-      _sum: { amount: true },
-    })
-    const correctedBalance = account.currentBalance - (internalEffect._sum.amount ?? 0)
-
-    // Anfangskontostand: korrigierter Saldo minus alle nicht-internen Transaktionen ab Monatsbeginn
-    const fromMonthStart = await prisma.transaction.aggregate({
-      where: {
-        accountId: id,
-        date: { gte: startOfMonth },
+        date: { lt: startOfMonth },
         NOT: {
           OR: [
             { type: 'TRANSFER' },
@@ -44,7 +31,7 @@ export async function GET(
       },
       _sum: { amount: true },
     })
-    const openingBalance = correctedBalance - (fromMonthStart._sum.amount ?? 0)
+    const openingBalance = openingResult._sum.amount ?? 0
 
     // Nur Gruppen dieses Kontos laden
     const allGroups = await prisma.categoryGroup.findMany({
