@@ -38,6 +38,7 @@ interface Category {
   type: string
   sortOrder: number
   isActive: boolean
+  rolloverEnabled: boolean
   subAccountGroupId?: string | null
   subAccountLinkType?: string | null
   subAccountGroup?: SubAccountGroup | null
@@ -113,13 +114,14 @@ function NewCategoryForm({ groupId, accountId, onDone }: { groupId: string; acco
   const [name, setName] = useState('')
   const [type, setType] = useState('EXPENSE')
   const [color, setColor] = useState('#6366f1')
+  const [rolloverEnabled, setRolloverEnabled] = useState(true)
 
   const createCat = useMutation({
     mutationFn: () =>
       fetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, color, type, groupId }),
+        body: JSON.stringify({ name, color, type, groupId, rolloverEnabled }),
       }).then(r => r.json()),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['category-groups', accountId] })
@@ -160,6 +162,18 @@ function NewCategoryForm({ groupId, accountId, onDone }: { groupId: string; acco
           <ColorDot key={c} color={c} selected={color === c} onClick={() => setColor(c)} />
         ))}
       </div>
+      <div className="flex items-center gap-2 pt-1">
+        <input
+          type="checkbox"
+          id="rollover-new"
+          checked={rolloverEnabled}
+          onChange={e => setRolloverEnabled(e.target.checked)}
+          className="rounded"
+        />
+        <label htmlFor="rollover-new" className="text-xs text-muted-foreground cursor-pointer">
+          Übertrag aktivieren
+        </label>
+      </div>
       <div className="flex gap-2 pt-1">
         <Button size="sm" className="h-7 text-xs" onClick={() => name.trim() && createCat.mutate()} disabled={!name.trim() || createCat.isPending}>
           Erstellen
@@ -192,6 +206,7 @@ function EditCategoryForm({
   const [groupId, setGroupId] = useState(category.groupId)
   const [subAccountGroupId, setSubAccountGroupId] = useState<string>(category.subAccountGroupId ?? '__none__')
   const [subAccountLinkType, setSubAccountLinkType] = useState(category.subAccountLinkType ?? 'BOOKING')
+  const [rolloverEnabled, setRolloverEnabled] = useState(category.rolloverEnabled)
 
   const { data: subAccountGroups = [] } = useQuery<(SubAccountGroup & { id: string })[]>({
     queryKey: ['sub-account-groups'],
@@ -207,6 +222,7 @@ function EditCategoryForm({
           name, color, type, groupId,
           subAccountGroupId: subAccountGroupId === '__none__' ? null : subAccountGroupId,
           subAccountLinkType,
+          rolloverEnabled,
         }),
       }).then(r => r.json()),
     onSuccess: () => {
@@ -288,6 +304,18 @@ function EditCategoryForm({
         {PRESET_COLORS.map(c => (
           <ColorDot key={c} color={c} selected={color === c} onClick={() => setColor(c)} />
         ))}
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <input
+          type="checkbox"
+          id={`rollover-${category.id}`}
+          checked={rolloverEnabled}
+          onChange={e => setRolloverEnabled(e.target.checked)}
+          className="rounded"
+        />
+        <label htmlFor={`rollover-${category.id}`} className="text-xs text-muted-foreground cursor-pointer">
+          Übertrag aktivieren
+        </label>
       </div>
       <div className="flex gap-2 pt-1">
         <Button size="sm" className="h-7 text-xs" onClick={() => name.trim() && updateCat.mutate()} disabled={!name.trim() || updateCat.isPending}>
