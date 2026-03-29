@@ -206,7 +206,7 @@ function EditCategoryForm({
   const [groupId, setGroupId] = useState(category.groupId)
   const [subAccountGroupId, setSubAccountGroupId] = useState<string>(category.subAccountGroupId ?? '__none__')
   const [subAccountLinkType, setSubAccountLinkType] = useState(category.subAccountLinkType ?? 'BOOKING')
-  const [rolloverEnabled, setRolloverEnabled] = useState(category.rolloverEnabled)
+  const [rolloverEnabled, setRolloverEnabled] = useState(category.rolloverEnabled ?? true)
 
   const { data: subAccountGroups = [] } = useQuery<(SubAccountGroup & { id: string })[]>({
     queryKey: ['sub-account-groups'],
