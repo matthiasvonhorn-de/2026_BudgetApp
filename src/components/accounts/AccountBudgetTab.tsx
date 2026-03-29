@@ -41,6 +41,7 @@ interface AccountBudgetData {
   year: number
   month: number
   openingBalance: number
+  openingBalancePlan: number
   subAccountsBalance: number
   groups: GroupData[]
   summary: {
@@ -342,6 +343,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
   }
 
   const opening = data?.openingBalance ?? 0
+  const openingPlan = data?.openingBalancePlan ?? 0
   const subAccountsBalance = data?.subAccountsBalance ?? 0
   const groups = data?.groups ?? []
   const summary = data?.summary
@@ -480,14 +482,14 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               <td className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Saldoübertrag aus Vormonat
               </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening)}`}>
-                {fmt(opening)}
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(openingPlan)}`}>
+                {fmt(openingPlan)}
               </td>
               <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening)}`}>
                 {fmt(opening)}
               </td>
-              <td className="px-3 py-1.5 border border-border text-right tabular-nums text-muted-foreground">
-                {fmt(0)}
+              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening - openingPlan)}`}>
+                {fmt(opening - openingPlan)}
               </td>
               <td className="px-3 py-1.5 border border-border" />
             </tr>

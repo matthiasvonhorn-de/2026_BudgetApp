@@ -90,6 +90,20 @@ export async function GET(
     const totalBudgeted = allCats.reduce((s, c) => s + c.budgeted, 0)
     const totalActivity = allCats.reduce((s, c) => s + c.activity, 0)
 
+    // Geplanter Saldoübertrag: Summe aller Budget-Einträge der Vormonate (Plan-Spalte)
+    const categoryIds = allGroups.flatMap(g => g.categories.map(c => c.id))
+    const openingPlanResult = await prisma.budgetEntry.aggregate({
+      where: {
+        categoryId: { in: categoryIds },
+        OR: [
+          { year: { lt: year } },
+          { year: year, month: { lt: month } },
+        ],
+      },
+      _sum: { budgeted: true },
+    })
+    const openingBalancePlan = openingPlanResult._sum.budgeted ?? 0
+
     // Sub-Account-Saldo bis Monatsende (Zeit-Reise-korrekt)
     // Spiegelt die Berechnung in SubAccountsSection: sub.initialBalance + group.initialBalance + Σ(entries)
     const subAccountsData = await prisma.subAccount.findMany({
@@ -116,12 +130,13 @@ export async function GET(
       year,
       month,
       openingBalance,
+      openingBalancePlan,
       subAccountsBalance,
       groups,
       summary: {
         totalBudgeted,
         totalActivity,
-        closingBalancePlan: openingBalance + totalBudgeted,
+        closingBalancePlan: openingBalancePlan + totalBudgeted,
         closingBalanceActual: openingBalance + totalActivity,
       },
     })
