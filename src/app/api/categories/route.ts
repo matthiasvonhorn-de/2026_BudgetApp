@@ -11,6 +11,7 @@ const categorySchema = z.object({
   sortOrder: z.number().default(0),
   subAccountGroupId: z.string().optional().nullable(),
   subAccountLinkType: z.enum(['BOOKING', 'TRANSFER']).default('BOOKING'),
+  rolloverEnabled: z.boolean().default(true),
 })
 
 export async function GET() {
