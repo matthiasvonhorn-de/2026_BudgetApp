@@ -11,6 +11,7 @@ const categorySchema = z.object({
   isActive: z.boolean().optional(),
   subAccountGroupId: z.string().nullable().optional(),
   subAccountLinkType: z.enum(['BOOKING', 'TRANSFER']).optional(),
+  rolloverEnabled: z.boolean().optional(),
 })
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {

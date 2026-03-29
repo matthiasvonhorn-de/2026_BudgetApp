@@ -21,7 +21,7 @@ export async function POST(
     const groups = await prisma.categoryGroup.findMany({
       where: { accountId: id },
       include: {
-        categories: { where: { isActive: true, type: 'EXPENSE' } },
+        categories: { where: { isActive: true, rolloverEnabled: true } },
       },
     })
     const categories = groups.flatMap(g => g.categories)

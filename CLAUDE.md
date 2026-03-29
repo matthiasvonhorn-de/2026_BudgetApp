@@ -69,6 +69,16 @@ src/hooks/              # Custom React hooks
 
 Spec-driven development: before any implementation, first work out a specification and save it to `docs/superpowers/specs/`. Only start implementation after the user has approved the spec.
 
+## Git Workflow — MANDATORY after every code change
+
+After completing ANY code change (bugfix, feature, refactor), always:
+1. `git add <files>` — stage the changed files
+2. `git commit -m "..."` — commit with a descriptive message
+3. `git push` — push to the remote branch
+4. Create or update a GitHub PR (`gh pr create --draft` or `gh pr view`)
+
+**Never finish a task without committing and pushing.** A fix that isn't pushed doesn't exist on GitHub.
+
 ## Critical gotchas
 
 - `prisma migrate dev` **does not work** with the libSQL adapter — use manual SQL + `prisma generate`.

@@ -58,6 +58,7 @@ model Category {
   groupId            String?
   sortOrder          Int           @default(0)
   isActive           Boolean       @default(true)
+  rolloverEnabled    Boolean       @default(true)
   subAccountGroupId   String?
   subAccountLinkType  String   @default("BOOKING")
   createdAt           DateTime @default(now())
