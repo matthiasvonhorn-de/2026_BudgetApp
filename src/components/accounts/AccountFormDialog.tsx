@@ -21,7 +21,7 @@ const schema = z.object({
   bank: z.string().optional(),
   iban: z.string().optional(),
   type: z.enum(['CHECKING', 'SAVINGS', 'CREDIT_CARD', 'CASH', 'INVESTMENT']),
-  currentBalance: z.coerce.number(),
+  currentBalance: z.coerce.number().transform(v => Math.round(v * 100) / 100),
   color: z.string(),
 })
 
@@ -59,7 +59,10 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
 
   useEffect(() => {
     if (open) {
-      form.reset(account ?? {
+      form.reset(account ? {
+        ...account,
+        currentBalance: Math.round((account.currentBalance ?? 0) * 100) / 100,
+      } : {
         name: '',
         bank: '',
         iban: '',
