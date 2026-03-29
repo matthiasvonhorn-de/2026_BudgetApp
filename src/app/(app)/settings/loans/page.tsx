@@ -51,6 +51,7 @@ function LoanDialog({
 }) {
   const qc = useQueryClient()
   const { currency } = useSettingsStore()
+  const fmt = useFormatCurrency()
   const [form, setForm] = useState<LoanForm>(EMPTY)
 
   useEffect(() => {
