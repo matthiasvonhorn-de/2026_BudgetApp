@@ -103,9 +103,10 @@ export async function POST(request: Request) {
       const txType = linkedGroup && linkType === 'TRANSFER' && !data.skipSubAccountEntry ? 'TRANSFER' : data.type
 
       // Create source transaction
+      const { skipSubAccountEntry: _skip1, skipPairedTransfer: _skip2, ...txData } = data
       const t = await tx.transaction.create({
         data: {
-          ...data,
+          ...txData,
           type: txType,
           date: new Date(data.date),
           categoryId: data.categoryId || null,
