@@ -12,6 +12,8 @@ const transactionSchema = z.object({
   categoryId: z.string().optional().nullable(),
   type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']).default('EXPENSE'),
   status: z.enum(['PENDING', 'CLEARED', 'RECONCILED']).default('PENDING'),
+  skipSubAccountEntry: z.boolean().optional().default(false),
+  skipPairedTransfer: z.boolean().optional().default(false),
 })
 
 export async function GET(request: Request) {
@@ -98,7 +100,7 @@ export async function POST(request: Request) {
       const linkType = category?.subAccountLinkType ?? 'BOOKING'
 
       // For TRANSFER link type, override the transaction type
-      const txType = linkedGroup && linkType === 'TRANSFER' ? 'TRANSFER' : data.type
+      const txType = linkedGroup && linkType === 'TRANSFER' && !data.skipSubAccountEntry ? 'TRANSFER' : data.type
 
       // Create source transaction
       const t = await tx.transaction.create({
@@ -117,7 +119,7 @@ export async function POST(request: Request) {
         data: { currentBalance: { increment: data.amount } },
       })
 
-      if (linkedGroup) {
+      if (linkedGroup && !data.skipSubAccountEntry) {
         // Sub-account entry: expense on main account → income in sub-account
         const entryAmount = -data.amount
         const entry = await tx.subAccountEntry.create({
@@ -134,7 +136,7 @@ export async function POST(request: Request) {
           data: { subAccountEntryId: entry.id },
         })
 
-        if (linkType === 'TRANSFER') {
+        if (linkType === 'TRANSFER' && !data.skipPairedTransfer) {
           // Create paired TRANSFER transaction on the target account
           const targetAccountId = linkedGroup.subAccount.accountId
           const pairedAmount = -data.amount  // opposite sign
