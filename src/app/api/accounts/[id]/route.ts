@@ -27,22 +27,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     })
     if (!account) return NextResponse.json({ error: 'Konto nicht gefunden' }, { status: 404 })
 
-    // Subtract internal allocation transactions — they don't affect the physical balance:
-    //   - TRANSFER: moves between own accounts
-    //   - EXPENSE with subAccountEntryId: BOOKING into a sub-account envelope
-    const internalEffect = await prisma.transaction.aggregate({
-      where: {
-        accountId: id,
-        OR: [
-          { type: 'TRANSFER' },
-          { type: 'EXPENSE', subAccountEntryId: { not: null } },
-        ],
-      },
-      _sum: { amount: true },
-    })
-    const correctedBalance = account.currentBalance - (internalEffect._sum.amount ?? 0)
-
-    return NextResponse.json({ ...account, currentBalance: correctedBalance })
+    return NextResponse.json(account)
   } catch {
     return NextResponse.json({ error: 'Fehler' }, { status: 500 })
   }
