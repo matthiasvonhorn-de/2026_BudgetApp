@@ -75,7 +75,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       } else if (!hadEntry && newSubGroupId) {
         // Create new sub-account entry
         const entry = await tx.subAccountEntry.create({
-          data: { date: newDate, description: newDescription, amount: -newAmount, fromBudget: false, groupId: newSubGroupId },
+          data: { date: newDate, description: newDescription, amount: -newAmount, fromBudget: true, groupId: newSubGroupId },
         })
         await tx.transaction.update({ where: { id }, data: { subAccountEntryId: entry.id } })
       }

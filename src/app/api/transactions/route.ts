@@ -125,7 +125,7 @@ export async function POST(request: Request) {
             date: new Date(data.date),
             description: data.description,
             amount: entryAmount,
-            fromBudget: false,
+            fromBudget: true,
             groupId: linkedGroup.id,
           },
         })
