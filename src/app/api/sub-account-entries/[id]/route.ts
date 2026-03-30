@@ -4,12 +4,11 @@ import { prisma } from '@/lib/prisma'
 export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   try {
-    // Verknüpfte Transaktion lösen, bevor der Eintrag gelöscht wird
-    await prisma.transaction.updateMany({
-      where: { subAccountEntryId: id },
-      data: { subAccountEntryId: null },
+    await prisma.$transaction(async (tx) => {
+      // Verknüpfte Transaktion löschen (falls vorhanden)
+      await tx.transaction.deleteMany({ where: { subAccountEntryId: id } })
+      await tx.subAccountEntry.delete({ where: { id } })
     })
-    await prisma.subAccountEntry.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error(e)
