@@ -69,13 +69,29 @@ src/hooks/              # Custom React hooks
 
 Spec-driven development: before any implementation, first work out a specification and save it to `docs/superpowers/specs/`. Only start implementation after the user has approved the spec.
 
-## Git Workflow — MANDATORY after every code change
+## Git Workflow — MANDATORY
 
-After completing ANY code change (bugfix, feature, refactor), always:
-1. `git add <files>` — stage the changed files
-2. `git commit -m "..."` — commit with a descriptive message
-3. `git push` — push to the remote branch
-4. Create or update a GitHub PR (`gh pr create --draft` or `gh pr view`)
+### 1. Branch — at the start of every task
+- Always branch off `main` before touching code
+- Naming: `feature/short-description`, `fix/short-description`, `chore/short-description`
+- `git checkout main && git pull && git checkout -b <branch-name>`
+
+### 2. Commit + Push — after every logical unit of work
+- `git add <files>` → `git commit -m "..."` → `git push`
+- Never leave uncommitted changes when done
+
+### 3. PR — create as Draft after the first push
+- `gh pr create --draft` immediately after the first commit on the branch
+- Status **Draft** = work in progress
+
+### 4. Ready for Review — only when the user explicitly says so
+- Examples: "PR ist fertig", "stell den PR bereit", "ready for review"
+- Never set automatically — always wait for explicit instruction
+- `gh pr ready <number>` or via GitHub MCP
+
+### 5. Merge — the user merges in GitHub themselves
+- After merge: delete branch locally (`git branch -d <branch>`) and pull `main`
+- Only do this when the user asks for cleanup
 
 **Never finish a task without committing and pushing.** A fix that isn't pushed doesn't exist on GitHub.
 
