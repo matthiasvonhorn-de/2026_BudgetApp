@@ -16,18 +16,14 @@ export async function GET(
     const account = await prisma.account.findUnique({ where: { id } })
     if (!account) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Saldoübertrag aus Vormonat: Summe aller echten Transaktionen vor Monatsbeginn
-    // (TRANSFER und Unterkonto-Buchungen bleiben außen vor, da intern)
+    // Saldoübertrag aus Vormonat: Summe aller kategorisierten Transaktionen vor Monatsbeginn.
+    // Gleicher Filter wie totalActivity — nur Transaktionen, die in Budget-Zeilen sichtbar sind.
+    // So gilt: closingBalanceActual(Vormonat) === openingBalance(dieserMonat)
     const openingResult = await prisma.transaction.aggregate({
       where: {
         accountId: id,
         date: { lt: startOfMonth },
-        NOT: {
-          OR: [
-            { type: 'TRANSFER' },
-            { type: 'EXPENSE', subAccountEntryId: { not: null } },
-          ],
-        },
+        categoryId: { not: null },
       },
       _sum: { amount: true },
     })
