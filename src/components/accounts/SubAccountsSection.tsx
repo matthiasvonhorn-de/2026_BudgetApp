@@ -74,14 +74,12 @@ function NewEntryRow({ groupId, accountId, onDone }: { groupId: string; accountI
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
-  const [fromBudget, setFromBudget] = useState(false)
-
   const mutation = useMutation({
     mutationFn: () =>
       fetch(`/api/sub-account-groups/${groupId}/entries`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, description, amount: parseFloat(amount), fromBudget }),
+        body: JSON.stringify({ date, description, amount: parseFloat(amount), fromBudget: false }),
       }).then(r => r.json()),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sub-accounts', accountId] })
@@ -104,12 +102,6 @@ function NewEntryRow({ groupId, accountId, onDone }: { groupId: string; accountI
       <td className="px-2 py-1 text-right">
         <input type="number" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)}
           className="border rounded px-1 py-0.5 text-xs w-24 text-right" />
-      </td>
-      <td className="px-2 py-1 text-center">
-        <label className="flex items-center gap-1 justify-center text-xs">
-          <input type="checkbox" checked={fromBudget} onChange={e => setFromBudget(e.target.checked)} />
-          Budget
-        </label>
       </td>
       <td className="px-2 py-1">
         <div className="flex gap-1">
