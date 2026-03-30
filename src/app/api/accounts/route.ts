@@ -22,27 +22,7 @@ export async function GET() {
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     })
 
-    // Internal allocations should NOT affect the physical account balance:
-    //   - TRANSFER transactions (money moves between own accounts)
-    //   - EXPENSE transactions linked to a sub-account entry (BOOKING = internal earmarking)
-    // INCOME transactions always represent real money received, so they stay.
-    const internalSums = await prisma.transaction.groupBy({
-      by: ['accountId'],
-      where: {
-        accountId: { in: accounts.map(a => a.id) },
-        OR: [
-          { type: 'TRANSFER' },
-          { type: 'EXPENSE', subAccountEntryId: { not: null } },
-        ],
-      },
-      _sum: { amount: true },
-    })
-    const internalMap = new Map(internalSums.map(t => [t.accountId, t._sum.amount ?? 0]))
-
-    const result = accounts.map(a => ({
-      ...a,
-      currentBalance: a.currentBalance - (internalMap.get(a.id) ?? 0),
-    }))
+    const result = accounts.map(a => ({ ...a }))
 
     return NextResponse.json(result)
   } catch {
