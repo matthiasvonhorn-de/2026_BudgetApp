@@ -78,6 +78,8 @@ export async function GET(
             rolledOver,
             activity,
             available,
+            subAccountGroupId: cat.subAccountGroupId,
+            subAccountLinkType: cat.subAccountLinkType,
           }
         }),
       }))
