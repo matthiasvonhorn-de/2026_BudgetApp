@@ -28,6 +28,8 @@ interface CategoryData {
   rolledOver: number
   activity: number
   available: number
+  subAccountGroupId: string | null
+  subAccountLinkType: string
 }
 
 interface GroupData {
@@ -162,6 +164,9 @@ function BookTransactionDialog({
   const [description, setDescription] = useState(state.cat?.name ?? '')
   const [amount, setAmount] = useState(state.cat ? Math.abs(state.cat.budgeted).toFixed(2) : '')
 
+  const [skipSubAccountEntry, setSkipSubAccountEntry] = useState(false)
+  const [skipPairedTransfer, setSkipPairedTransfer] = useState(false)
+
   const [lastCatId, setLastCatId] = useState<string | undefined>()
   if (state.open && state.cat && state.cat.id !== lastCatId) {
     setLastCatId(state.cat.id)
@@ -169,6 +174,8 @@ function BookTransactionDialog({
     setDate(defaultDate)
     setDescription(state.cat.name)
     setAmount(Math.abs(state.cat.budgeted).toFixed(2))
+    setSkipSubAccountEntry(false)
+    setSkipPairedTransfer(false)
   }
 
   const bookMutation = useMutation({
@@ -184,6 +191,8 @@ function BookTransactionDialog({
           accountId: selAccountId,
           categoryId: state.cat.id,
           type: state.cat.type as 'INCOME' | 'EXPENSE' | 'TRANSFER',
+          skipSubAccountEntry,
+          skipPairedTransfer,
         }),
       }).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() })
     },
@@ -241,6 +250,33 @@ function BookTransactionDialog({
             <Label>Betrag</Label>
             <Input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} />
           </div>
+          {state.cat.subAccountGroupId && (
+            <div className="space-y-2 pt-2 border-t">
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={skipSubAccountEntry}
+                  onChange={e => {
+                    setSkipSubAccountEntry(e.target.checked)
+                    if (e.target.checked) setSkipPairedTransfer(true)
+                    else setSkipPairedTransfer(false)
+                  }}
+                />
+                <span>Unterkonto-Eintrag überspringen</span>
+              </label>
+              {state.cat.subAccountLinkType === 'TRANSFER' && (
+                <label className={`flex items-center gap-2 text-sm select-none ${skipSubAccountEntry ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                  <input
+                    type="checkbox"
+                    checked={skipPairedTransfer}
+                    disabled={skipSubAccountEntry}
+                    onChange={e => setSkipPairedTransfer(e.target.checked)}
+                  />
+                  <span>Gegenbuchung überspringen</span>
+                </label>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Abbrechen</Button>
