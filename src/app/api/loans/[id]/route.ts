@@ -9,6 +9,7 @@ const UpdateSchema = z.object({
   accountId: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  paidUntil: z.string().nullable().optional(),
   // Finanzparameter — bei Änderung wird Tilgungsplan neu berechnet
   loanType: z.enum(['ANNUITAETENDARLEHEN', 'RATENKREDIT']).optional(),
   principal: z.number().positive().optional(),
@@ -80,6 +81,26 @@ export async function PUT(
           ...(data.notes !== undefined && { notes: data.notes }),
         },
       })
+
+      if (data.paidUntil !== undefined) {
+        if (data.paidUntil === null) {
+          await prisma.loanPayment.updateMany({
+            where: { loanId: id, transactionId: null },
+            data: { paidAt: null },
+          })
+        } else {
+          const cutoff = new Date(data.paidUntil)
+          await prisma.loanPayment.updateMany({
+            where: { loanId: id, transactionId: null, dueDate: { lte: cutoff } },
+            data: { paidAt: new Date() },
+          })
+          await prisma.loanPayment.updateMany({
+            where: { loanId: id, transactionId: null, dueDate: { gt: cutoff } },
+            data: { paidAt: null },
+          })
+        }
+      }
+
       return NextResponse.json(loan)
     }
 
@@ -146,6 +167,25 @@ export async function PUT(
           extraPayment: 0,
         })),
       })
+
+      if (data.paidUntil !== undefined) {
+        if (data.paidUntil === null) {
+          await tx.loanPayment.updateMany({
+            where: { loanId: id, transactionId: null },
+            data: { paidAt: null },
+          })
+        } else {
+          const cutoff = new Date(data.paidUntil)
+          await tx.loanPayment.updateMany({
+            where: { loanId: id, transactionId: null, dueDate: { lte: cutoff } },
+            data: { paidAt: new Date() },
+          })
+          await tx.loanPayment.updateMany({
+            where: { loanId: id, transactionId: null, dueDate: { gt: cutoff } },
+            data: { paidAt: null },
+          })
+        }
+      }
 
       return updated
     })
