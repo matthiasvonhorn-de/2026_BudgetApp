@@ -40,9 +40,9 @@ export async function GET() {
       const silentPaid = loan.payments.filter(p => p.paidAt !== null && p.transactionId === null)
       const paidUntil = silentPaid.length > 0
         ? silentPaid.reduce(
-            (max, p) => new Date(p.dueDate) > new Date(max) ? p.dueDate : max,
+            (max, p) => p.dueDate > max ? p.dueDate : max,
             silentPaid[0].dueDate,
-          )
+          ).toISOString().slice(0, 10)
         : null
 
       return {
