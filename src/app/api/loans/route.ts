@@ -117,6 +117,7 @@ export async function POST(request: Request) {
       await prisma.loanPayment.updateMany({
         where: {
           loanId: loan.id,
+          transactionId: null,
           dueDate: { lte: new Date(data.paidUntil) },
         },
         data: { paidAt: new Date() },
