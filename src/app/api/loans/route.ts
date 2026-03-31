@@ -14,6 +14,7 @@ const CreateLoanSchema = z.object({
   accountId: z.string().optional().nullable(),
   categoryId: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  paidUntil: z.string().optional().nullable(),
 })
 
 export async function GET() {
@@ -111,6 +112,16 @@ export async function POST(request: Request) {
         extraPayment: 0,
       })),
     })
+
+    if (data.paidUntil) {
+      await prisma.loanPayment.updateMany({
+        where: {
+          loanId: loan.id,
+          dueDate: { lte: new Date(data.paidUntil) },
+        },
+        data: { paidAt: new Date() },
+      })
+    }
 
     return NextResponse.json(loan, { status: 201 })
   } catch (e) {
