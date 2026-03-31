@@ -36,9 +36,19 @@ export async function GET() {
       const remainingBalance = loan.payments.at(-1)?.scheduledBalance ?? 0
       const nextUnpaid = loan.payments.find(p => p.paidAt === null)
 
+      // Compute paidUntil: latest dueDate among silently-paid periods (no booking)
+      const silentPaid = loan.payments.filter(p => p.paidAt !== null && p.transactionId === null)
+      const paidUntil = silentPaid.length > 0
+        ? silentPaid.reduce(
+            (max, p) => new Date(p.dueDate) > new Date(max) ? p.dueDate : max,
+            silentPaid[0].dueDate,
+          )
+        : null
+
       return {
         ...loan,
         payments: undefined,
+        paidUntil,
         stats: {
           totalInterestPaid: Math.round(totalInterestPaid * 100) / 100,
           totalPrincipalPaid: Math.round((totalPrincipalPaid + extraPaid) * 100) / 100,
