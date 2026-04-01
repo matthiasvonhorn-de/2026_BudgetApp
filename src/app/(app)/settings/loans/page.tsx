@@ -233,11 +233,12 @@ function LoanDialog({
 
             <div className="col-span-2 space-y-1.5">
               <Label>Bezahlt bis</Label>
-              <Input
+              <input
                 type="date"
                 value={form.paidUntil}
                 min={form.startDate}
                 onChange={e => set('paidUntil', e.target.value)}
+                className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
               <p className="text-xs text-muted-foreground">
                 Alle Raten bis zu diesem Datum werden ohne Buchung als bezahlt markiert.
