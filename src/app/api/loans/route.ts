@@ -36,19 +36,10 @@ export async function GET() {
       const remainingBalance = loan.payments.at(-1)?.scheduledBalance ?? 0
       const nextUnpaid = loan.payments.find(p => p.paidAt === null)
 
-      // Compute paidUntil: latest dueDate among silently-paid periods (no booking)
-      const silentPaid = loan.payments.filter(p => p.paidAt !== null && p.transactionId === null)
-      const paidUntil = silentPaid.length > 0
-        ? silentPaid.reduce(
-            (max, p) => p.dueDate > max ? p.dueDate : max,
-            silentPaid[0].dueDate,
-          ).toISOString().slice(0, 10)
-        : null
-
       return {
         ...loan,
         payments: undefined,
-        paidUntil,
+        paidUntil: loan.paidUntil ? loan.paidUntil.toISOString().slice(0, 10) : null,
         stats: {
           totalInterestPaid: Math.round(totalInterestPaid * 100) / 100,
           totalPrincipalPaid: Math.round((totalPrincipalPaid + extraPaid) * 100) / 100,
@@ -124,14 +115,23 @@ export async function POST(request: Request) {
     })
 
     if (data.paidUntil) {
-      await prisma.loanPayment.updateMany({
-        where: {
-          loanId: loan.id,
-          transactionId: null,
-          dueDate: { lte: new Date(data.paidUntil) },
-        },
-        data: { paidAt: new Date() },
+      const cutoff = new Date(data.paidUntil)
+      // Effektives paidUntil: letztes vorhandenes Payment-Datum ≤ eingegebenem Datum
+      const latestPayment = await prisma.loanPayment.findFirst({
+        where: { loanId: loan.id, dueDate: { lte: cutoff } },
+        orderBy: { dueDate: 'desc' },
+        select: { dueDate: true },
       })
+      if (latestPayment) {
+        await prisma.loanPayment.updateMany({
+          where: { loanId: loan.id, transactionId: null, dueDate: { lte: latestPayment.dueDate } },
+          data: { paidAt: new Date() },
+        })
+        await prisma.loan.update({
+          where: { id: loan.id },
+          data: { paidUntil: latestPayment.dueDate },
+        })
+      }
     }
 
     return NextResponse.json(loan, { status: 201 })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Trash2, ArrowLeft, Pencil } from 'lucide-react'
@@ -55,9 +55,13 @@ function LoanDialog({
   const { currency } = useSettingsStore()
   const fmt = useFormatCurrency()
   const [form, setForm] = useState<LoanForm>(EMPTY)
+  const paidUntilInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open) {
+      const paidUntilValue = loan?.paidUntil
+        ? new Date(loan.paidUntil).toISOString().slice(0, 10)
+        : ''
       if (loan) {
         setForm({
           name: loan.name,
@@ -67,15 +71,18 @@ function LoanDialog({
           initialRepaymentRate: loan.initialRepaymentRate != null ? (loan.initialRepaymentRate * 100).toFixed(3) : '',
           termMonths: loan.termMonths.toString(),
           startDate: new Date(loan.startDate).toISOString().slice(0, 10),
-          paidUntil: loan.paidUntil
-            ? new Date(loan.paidUntil).toISOString().slice(0, 10)
-            : '',
+          paidUntil: paidUntilValue,
           accountId: loan.accountId ?? '',
           categoryId: loan.categoryId ?? '',
           notes: loan.notes ?? '',
         })
       } else {
         setForm(EMPTY)
+      }
+      // Set the uncontrolled date input imperatively — bypasses the macOS date
+      // picker issue where onChange doesn't fire when using the native calendar popup.
+      if (paidUntilInputRef.current) {
+        paidUntilInputRef.current.value = paidUntilValue
       }
     }
   }, [open, loan])
@@ -115,7 +122,7 @@ function LoanDialog({
       : 0,
     termMonths: parseInt(form.termMonths),
     startDate: form.startDate,
-    paidUntil: form.paidUntil || null,
+    paidUntil: paidUntilInputRef.current?.value || null,
     accountId: form.accountId || null,
     categoryId: form.categoryId || null,
     notes: form.notes || null,
@@ -234,10 +241,9 @@ function LoanDialog({
             <div className="col-span-2 space-y-1.5">
               <Label>Bezahlt bis</Label>
               <input
+                ref={paidUntilInputRef}
                 type="date"
-                value={form.paidUntil}
                 min={form.startDate}
-                onChange={e => set('paidUntil', e.target.value)}
                 className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
               <p className="text-xs text-muted-foreground">
