@@ -20,11 +20,13 @@ model Account {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  transactions    Transaction[]
-  reconciliations Reconciliation[]
-  subAccounts     SubAccount[]
-  categoryGroups  CategoryGroup[]
-  loans           Loan[]
+  transactions        Transaction[]
+  reconciliations     Reconciliation[]
+  subAccounts         SubAccount[]
+  categoryGroups      CategoryGroup[]
+  loans               Loan[]
+  savingsConfig       SavingsConfig?   @relation("SavingsAccount")
+  linkedSavingsPlans  SavingsConfig[]  @relation("SavingsLinkedAccount")
 }
 
 enum AccountType {
@@ -33,6 +35,8 @@ enum AccountType {
   CREDIT_CARD
   CASH
   INVESTMENT
+  SPARPLAN
+  FESTGELD
 }
 
 model CategoryGroup {
@@ -268,6 +272,73 @@ model LoanPayment {
 
   @@unique([loanId, periodNumber])
   @@index([loanId])
+}
+
+enum SavingsFrequency {
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+}
+
+enum SavingsEntryType {
+  CONTRIBUTION
+  INTEREST
+}
+
+// Spar-spezifische Konfiguration — 1:1 mit einem Account vom Typ SPARPLAN oder FESTGELD
+model SavingsConfig {
+  id                    String            @id @default(cuid())
+  accountId             String            @unique
+  account               Account           @relation("SavingsAccount", fields: [accountId], references: [id])
+
+  initialBalance        Float             @default(0)
+  accountNumber         String?           // IBAN / Kontonummer des Sparkontos (informativ)
+
+  // Nur SPARPLAN:
+  contributionAmount    Float             @default(0)
+  contributionFrequency SavingsFrequency?
+
+  // Beide Typen:
+  interestRate          Float             // p.a. als Dezimal (z.B. 0.03 = 3 %)
+  interestFrequency     SavingsFrequency
+
+  startDate             DateTime
+  termMonths            Int?              // null = unbegrenzt (Anzeige: 60 Monate)
+
+  // Nur SPARPLAN — Girokonto für automatische EXPENSE-Buchungen:
+  linkedAccountId       String?
+  linkedAccount         Account?          @relation("SavingsLinkedAccount", fields: [linkedAccountId], references: [id])
+  categoryId            String?           // Kategorie für EXPENSE auf verknüpftem Girokonto
+
+  notes                 String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  entries               SavingsEntry[]
+}
+
+model SavingsEntry {
+  id              String           @id @default(cuid())
+  savingsConfigId String
+  savingsConfig   SavingsConfig    @relation(fields: [savingsConfigId], references: [id], onDelete: Cascade)
+
+  entryType        SavingsEntryType
+  periodNumber     Int
+  dueDate          DateTime
+
+  scheduledAmount  Float            // Sparrate ODER geplanter Zinsbetrag
+  scheduledBalance Float            // geplanter Saldo nach diesem Eintrag
+
+  // Gesetzt sobald die Buchung ausgelöst wurde:
+  paidAt            DateTime?
+  transactionId     String?  @unique  // INCOME-Transaktion auf dem Sparkonto
+  giroTransactionId String?  @unique  // EXPENSE-Transaktion auf Girokonto (nur CONTRIBUTION)
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([savingsConfigId, entryType, periodNumber])
+  @@index([savingsConfigId])
 }
 
 model CsvProfile {
