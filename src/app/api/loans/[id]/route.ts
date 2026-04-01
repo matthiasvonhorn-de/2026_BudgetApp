@@ -9,6 +9,7 @@ const UpdateSchema = z.object({
   accountId: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  paidUntil: z.string().nullable().optional(),
   // Finanzparameter — bei Änderung wird Tilgungsplan neu berechnet
   loanType: z.enum(['ANNUITAETENDARLEHEN', 'RATENKREDIT']).optional(),
   principal: z.number().positive().optional(),
@@ -41,6 +42,7 @@ export async function GET(
 
     return NextResponse.json({
       ...loan,
+      paidUntil: loan.paidUntil ? loan.paidUntil.toISOString().slice(0, 10) : null,
       stats: {
         totalInterestPaid: Math.round(totalInterestPaid * 100) / 100,
         totalPrincipalPaid: Math.round(totalPrincipalPaid * 100) / 100,
@@ -55,6 +57,19 @@ export async function GET(
   }
 }
 
+// Schneidet paidUntil auf das nächst kleinere vorhandene Payment-Datum
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function resolveEffectivePaidUntil(tx: any, loanId: string, paidUntil: string | null): Promise<Date | null> {
+  if (!paidUntil) return null
+  const cutoff = new Date(paidUntil)
+  const latest = await tx.loanPayment.findFirst({
+    where: { loanId, dueDate: { lte: cutoff } },
+    orderBy: { dueDate: 'desc' },
+    select: { dueDate: true },
+  })
+  return latest?.dueDate ?? null
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -67,20 +82,59 @@ export async function PUT(
     const existing = await prisma.loan.findUnique({ where: { id } })
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const financialChanged = FINANCIAL_KEYS.some(k => data[k] !== undefined)
+    // Echter Wertevergleich statt nur "ist vorhanden"
+    const existingStartDate = new Date(existing.startDate).toISOString().slice(0, 10)
+    const financialChanged =
+      (data.loanType !== undefined && data.loanType !== existing.loanType) ||
+      (data.principal !== undefined && data.principal !== existing.principal) ||
+      (data.interestRate !== undefined && Math.abs(data.interestRate - existing.interestRate) > 1e-9) ||
+      (data.initialRepaymentRate !== undefined && Math.abs((data.initialRepaymentRate ?? 0) - existing.initialRepaymentRate) > 1e-9) ||
+      (data.termMonths !== undefined && data.termMonths !== existing.termMonths) ||
+      (data.startDate !== undefined && data.startDate !== existingStartDate)
 
     if (!financialChanged) {
-      // Nur Metadaten — einfaches Update
-      const loan = await prisma.loan.update({
-        where: { id },
-        data: {
-          ...(data.name !== undefined && { name: data.name }),
-          ...(data.accountId !== undefined && { accountId: data.accountId }),
-          ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
-          ...(data.notes !== undefined && { notes: data.notes }),
-        },
+      // Nur Metadaten — atomisches Update
+      const loan = await prisma.$transaction(async (tx) => {
+        const effectivePaidUntil = data.paidUntil !== undefined
+          ? await resolveEffectivePaidUntil(tx, id, data.paidUntil)
+          : undefined
+
+        const updated = await tx.loan.update({
+          where: { id },
+          data: {
+            ...(data.name !== undefined && { name: data.name }),
+            ...(data.accountId !== undefined && { accountId: data.accountId }),
+            ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+            ...(data.notes !== undefined && { notes: data.notes }),
+            ...(effectivePaidUntil !== undefined && { paidUntil: effectivePaidUntil }),
+          },
+        })
+
+        if (data.paidUntil !== undefined) {
+          if (effectivePaidUntil === null) {
+            await tx.loanPayment.updateMany({
+              where: { loanId: id, transactionId: null },
+              data: { paidAt: null },
+            })
+          } else {
+            await tx.loanPayment.updateMany({
+              where: { loanId: id, transactionId: null, dueDate: { lte: effectivePaidUntil } },
+              data: { paidAt: new Date() },
+            })
+            await tx.loanPayment.updateMany({
+              where: { loanId: id, transactionId: null, dueDate: { gt: effectivePaidUntil } },
+              data: { paidAt: null },
+            })
+          }
+        }
+
+        return updated
       })
-      return NextResponse.json(loan)
+
+      return NextResponse.json({
+        ...loan,
+        paidUntil: loan.paidUntil ? loan.paidUntil.toISOString().slice(0, 10) : null,
+      })
     }
 
     // Finanzparameter geändert → Tilgungsplan neu berechnen
@@ -147,10 +201,39 @@ export async function PUT(
         })),
       })
 
+      if (data.paidUntil !== undefined) {
+        const effectivePaidUntil = await resolveEffectivePaidUntil(tx, id, data.paidUntil)
+
+        // paidUntil im Kredit-Datensatz speichern
+        await tx.loan.update({
+          where: { id },
+          data: { paidUntil: effectivePaidUntil },
+        })
+
+        if (effectivePaidUntil === null) {
+          await tx.loanPayment.updateMany({
+            where: { loanId: id, transactionId: null },
+            data: { paidAt: null },
+          })
+        } else {
+          await tx.loanPayment.updateMany({
+            where: { loanId: id, transactionId: null, dueDate: { lte: effectivePaidUntil } },
+            data: { paidAt: new Date() },
+          })
+          await tx.loanPayment.updateMany({
+            where: { loanId: id, transactionId: null, dueDate: { gt: effectivePaidUntil } },
+            data: { paidAt: null },
+          })
+        }
+      }
+
       return updated
     })
 
-    return NextResponse.json(loan)
+    return NextResponse.json({
+      ...loan,
+      paidUntil: loan.paidUntil ? loan.paidUntil.toISOString().slice(0, 10) : null,
+    })
   } catch (e) {
     console.error(e)
     return NextResponse.json({ error: 'Fehler' }, { status: 500 })

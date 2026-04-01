@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Trash2, ArrowLeft, Pencil } from 'lucide-react'
@@ -24,6 +24,7 @@ interface LoanForm {
   initialRepaymentRate: string
   termMonths: string
   startDate: string
+  paidUntil: string
   accountId: string
   categoryId: string
   notes: string
@@ -37,6 +38,7 @@ const EMPTY: LoanForm = {
   initialRepaymentRate: '',
   termMonths: '',
   startDate: new Date().toISOString().slice(0, 10),
+  paidUntil: '',
   accountId: '',
   categoryId: '',
   notes: '',
@@ -53,24 +55,56 @@ function LoanDialog({
   const { currency } = useSettingsStore()
   const fmt = useFormatCurrency()
   const [form, setForm] = useState<LoanForm>(EMPTY)
+  // paidUntilDraft is the source of truth for paidUntil — updated via native
+  // DOM events so Safari's date picker is captured regardless of React's
+  // synthetic event layer or Base UI portal timing.
+  const [paidUntilDraft, setPaidUntilDraft] = useState('')
+  const paidUntilInitValRef = useRef('')  // holds the init value for deferred portal mount
+  const paidUntilNodeRef = useRef<HTMLInputElement | null>(null)
+
+  // Callback ref: fires when the input element mounts (handles Base UI portal
+  // deferred rendering — element may mount after our useEffect runs).
+  const paidUntilCallbackRef = useCallback((node: HTMLInputElement | null) => {
+    paidUntilNodeRef.current = node
+    if (!node) return
+    // Restore value in case useEffect already ran before portal mounted
+    node.value = paidUntilInitValRef.current
+    // Native listeners catch Safari's date picker (React synthetic onChange misses it).
+    // blur fires before the Speichern button click handler runs, so it catches
+    // the case where the user types a date and immediately clicks Speichern.
+    const handler = () => setPaidUntilDraft(node.value)
+    node.addEventListener('change', handler)
+    node.addEventListener('input', handler)
+    node.addEventListener('blur', handler)
+  }, [])
 
   useEffect(() => {
     if (open) {
+      const paidUntilValue = loan?.paidUntil
+        ? new Date(loan.paidUntil).toISOString().slice(0, 10)
+        : ''
       if (loan) {
         setForm({
           name: loan.name,
           loanType: loan.loanType,
           principal: loan.principal.toString(),
           interestRate: (loan.interestRate * 100).toFixed(3),
-          initialRepaymentRate: loan.initialRepaymentRate > 0 ? (loan.initialRepaymentRate * 100).toFixed(3) : '',
+          initialRepaymentRate: loan.initialRepaymentRate != null ? (loan.initialRepaymentRate * 100).toFixed(3) : '',
           termMonths: loan.termMonths.toString(),
           startDate: new Date(loan.startDate).toISOString().slice(0, 10),
+          paidUntil: paidUntilValue,
           accountId: loan.accountId ?? '',
           categoryId: loan.categoryId ?? '',
           notes: loan.notes ?? '',
         })
       } else {
         setForm(EMPTY)
+      }
+      paidUntilInitValRef.current = paidUntilValue
+      setPaidUntilDraft(paidUntilValue)
+      // Update the DOM node directly if already mounted (re-open scenario)
+      if (paidUntilNodeRef.current) {
+        paidUntilNodeRef.current.value = paidUntilValue
       }
     }
   }, [open, loan])
@@ -110,6 +144,9 @@ function LoanDialog({
       : 0,
     termMonths: parseInt(form.termMonths),
     startDate: form.startDate,
+    // paidUntilDraft is updated by native events; fall back to direct DOM read
+    // in case blur/change hadn't fired yet (e.g. keyboard entry without tabbing away).
+    paidUntil: paidUntilDraft || paidUntilNodeRef.current?.value || null,
     accountId: form.accountId || null,
     categoryId: form.categoryId || null,
     notes: form.notes || null,
@@ -223,6 +260,19 @@ function LoanDialog({
                 value={form.startDate}
                 onChange={e => set('startDate', e.target.value)}
               />
+            </div>
+
+            <div className="col-span-2 space-y-1.5">
+              <Label>Bezahlt bis</Label>
+              <input
+                ref={paidUntilCallbackRef}
+                type="date"
+                min={form.startDate}
+                className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              />
+              <p className="text-xs text-muted-foreground">
+                Alle Raten bis zu diesem Datum werden ohne Buchung als bezahlt markiert.
+              </p>
             </div>
 
             {form.loanType === 'ANNUITAETENDARLEHEN' && (

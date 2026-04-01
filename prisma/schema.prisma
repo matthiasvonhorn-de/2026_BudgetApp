@@ -236,6 +236,7 @@ model Loan {
   initialRepaymentRate  Float         @default(0)
   accountId             String?
   categoryId            String?       // Kategorie für gebuchte Kreditraten-Transaktionen
+  paidUntil      DateTime?     // Letztes Datum bis zu dem Raten stillschweigend bezahlt sind
   notes          String?
   isActive       Boolean       @default(true)
   createdAt      DateTime      @default(now())

@@ -14,6 +14,7 @@ const CreateLoanSchema = z.object({
   accountId: z.string().optional().nullable(),
   categoryId: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
+  paidUntil: z.string().optional().nullable(),
 })
 
 export async function GET() {
@@ -38,6 +39,7 @@ export async function GET() {
       return {
         ...loan,
         payments: undefined,
+        paidUntil: loan.paidUntil ? loan.paidUntil.toISOString().slice(0, 10) : null,
         stats: {
           totalInterestPaid: Math.round(totalInterestPaid * 100) / 100,
           totalPrincipalPaid: Math.round((totalPrincipalPaid + extraPaid) * 100) / 100,
@@ -111,6 +113,26 @@ export async function POST(request: Request) {
         extraPayment: 0,
       })),
     })
+
+    if (data.paidUntil) {
+      const cutoff = new Date(data.paidUntil)
+      // Effektives paidUntil: letztes vorhandenes Payment-Datum ≤ eingegebenem Datum
+      const latestPayment = await prisma.loanPayment.findFirst({
+        where: { loanId: loan.id, dueDate: { lte: cutoff } },
+        orderBy: { dueDate: 'desc' },
+        select: { dueDate: true },
+      })
+      if (latestPayment) {
+        await prisma.loanPayment.updateMany({
+          where: { loanId: loan.id, transactionId: null, dueDate: { lte: latestPayment.dueDate } },
+          data: { paidAt: new Date() },
+        })
+        await prisma.loan.update({
+          where: { id: loan.id },
+          data: { paidUntil: latestPayment.dueDate },
+        })
+      }
+    }
 
     return NextResponse.json(loan, { status: 201 })
   } catch (e) {
