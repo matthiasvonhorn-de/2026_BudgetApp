@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Trash2, ArrowLeft, Pencil } from 'lucide-react'
@@ -55,7 +55,25 @@ function LoanDialog({
   const { currency } = useSettingsStore()
   const fmt = useFormatCurrency()
   const [form, setForm] = useState<LoanForm>(EMPTY)
-  const paidUntilInputRef = useRef<HTMLInputElement>(null)
+  // paidUntilDraft is the source of truth for paidUntil — updated via native
+  // DOM events so Safari's date picker is captured regardless of React's
+  // synthetic event layer or Base UI portal timing.
+  const [paidUntilDraft, setPaidUntilDraft] = useState('')
+  const paidUntilInitValRef = useRef('')  // holds the init value for deferred portal mount
+  const paidUntilNodeRef = useRef<HTMLInputElement | null>(null)
+
+  // Callback ref: fires when the input element mounts (handles Base UI portal
+  // deferred rendering — element may mount after our useEffect runs).
+  const paidUntilCallbackRef = useCallback((node: HTMLInputElement | null) => {
+    paidUntilNodeRef.current = node
+    if (!node) return
+    // Restore value in case useEffect already ran before portal mounted
+    node.value = paidUntilInitValRef.current
+    // Native listeners catch Safari's date picker (React synthetic onChange misses it)
+    const handler = () => setPaidUntilDraft(node.value)
+    node.addEventListener('change', handler)
+    node.addEventListener('input', handler)
+  }, [])
 
   useEffect(() => {
     if (open) {
@@ -79,10 +97,11 @@ function LoanDialog({
       } else {
         setForm(EMPTY)
       }
-      // Set the uncontrolled date input imperatively — bypasses the macOS date
-      // picker issue where onChange doesn't fire when using the native calendar popup.
-      if (paidUntilInputRef.current) {
-        paidUntilInputRef.current.value = paidUntilValue
+      paidUntilInitValRef.current = paidUntilValue
+      setPaidUntilDraft(paidUntilValue)
+      // Update the DOM node directly if already mounted (re-open scenario)
+      if (paidUntilNodeRef.current) {
+        paidUntilNodeRef.current.value = paidUntilValue
       }
     }
   }, [open, loan])
@@ -122,7 +141,7 @@ function LoanDialog({
       : 0,
     termMonths: parseInt(form.termMonths),
     startDate: form.startDate,
-    paidUntil: paidUntilInputRef.current?.value || null,
+    paidUntil: paidUntilDraft || null,
     accountId: form.accountId || null,
     categoryId: form.categoryId || null,
     notes: form.notes || null,
@@ -241,7 +260,7 @@ function LoanDialog({
             <div className="col-span-2 space-y-1.5">
               <Label>Bezahlt bis</Label>
               <input
-                ref={paidUntilInputRef}
+                ref={paidUntilCallbackRef}
                 type="date"
                 min={form.startDate}
                 className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
