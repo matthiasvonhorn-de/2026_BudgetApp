@@ -1,16 +1,20 @@
 'use client'
 
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable'
 import { SortableAccountCard } from '@/components/accounts/SortableAccountCard'
+import { SavingsFormDialog } from '@/components/accounts/SavingsFormDialog'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useAccountReorder } from '@/hooks/useAccountReorder'
 import { Button } from '@/components/ui/button'
+import { Plus } from 'lucide-react'
 
 export default function AccountsPage() {
   const fmt = useFormatCurrency()
   const sensors = useSensors(useSensor(PointerSensor))
+  const [savingsDialog, setSavingsDialog] = useState(false)
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['accounts'],
@@ -31,6 +35,10 @@ export default function AccountsPage() {
             Gesamtvermögen: <span className="font-semibold text-foreground">{fmt(totalBalance)}</span>
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={() => setSavingsDialog(true)}>
+          <Plus className="h-4 w-4 mr-1" /> Sparkonto / Festgeld
+        </Button>
         {!isLoading && accounts.length > 1 && (
           isReordering ? (
             <div className="flex gap-2">
@@ -47,6 +55,7 @@ export default function AccountsPage() {
             </Button>
           )
         )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -71,6 +80,8 @@ export default function AccountsPage() {
           </SortableContext>
         </DndContext>
       )}
+
+      <SavingsFormDialog open={savingsDialog} onOpenChange={setSavingsDialog} />
     </div>
   )
 }

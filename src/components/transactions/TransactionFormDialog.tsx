@@ -361,7 +361,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                   <FormItem>
                     <FormLabel>Gruppe</FormLabel>
                     <Select
-                      onValueChange={(v) => handleGroupChange(v === '__none__' ? '' : v)}
+                      onValueChange={(v) => handleGroupChange(v === '__none__' ? '' : (v ?? ''))}
                       value={selectedGroupId || '__none__'}
                     >
                       <SelectTrigger>

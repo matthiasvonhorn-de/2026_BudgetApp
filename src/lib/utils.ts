@@ -25,4 +25,6 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
   CREDIT_CARD: 'Kreditkarte',
   CASH: 'Bargeld',
   INVESTMENT: 'Depot',
+  SPARPLAN: 'Sparplan',
+  FESTGELD: 'Festgeld',
 }

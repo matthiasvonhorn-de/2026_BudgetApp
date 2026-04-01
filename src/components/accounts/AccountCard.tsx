@@ -18,10 +18,15 @@ interface AccountCardProps {
   }
 }
 
+const SAVINGS_TYPES = new Set(['SPARPLAN', 'FESTGELD'])
+
 export function AccountCard({ account }: AccountCardProps) {
   const fmt = useFormatCurrency()
+  const href = SAVINGS_TYPES.has(account.type)
+    ? `/savings/${account.id}`
+    : `/accounts/${account.id}`
   return (
-    <Link href={`/accounts/${account.id}`}>
+    <Link href={href}>
       <Card className="hover:shadow-md transition-shadow cursor-pointer border-l-4" style={{ borderLeftColor: account.color }}>
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
