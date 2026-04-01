@@ -71,35 +71,39 @@ export async function PUT(
     const financialChanged = FINANCIAL_KEYS.some(k => data[k] !== undefined)
 
     if (!financialChanged) {
-      // Nur Metadaten — einfaches Update
-      const loan = await prisma.loan.update({
-        where: { id },
-        data: {
-          ...(data.name !== undefined && { name: data.name }),
-          ...(data.accountId !== undefined && { accountId: data.accountId }),
-          ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
-          ...(data.notes !== undefined && { notes: data.notes }),
-        },
-      })
+      // Nur Metadaten — atomisches Update
+      const loan = await prisma.$transaction(async (tx) => {
+        const updated = await tx.loan.update({
+          where: { id },
+          data: {
+            ...(data.name !== undefined && { name: data.name }),
+            ...(data.accountId !== undefined && { accountId: data.accountId }),
+            ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+            ...(data.notes !== undefined && { notes: data.notes }),
+          },
+        })
 
-      if (data.paidUntil !== undefined) {
-        if (data.paidUntil === null) {
-          await prisma.loanPayment.updateMany({
-            where: { loanId: id, transactionId: null },
-            data: { paidAt: null },
-          })
-        } else {
-          const cutoff = new Date(data.paidUntil)
-          await prisma.loanPayment.updateMany({
-            where: { loanId: id, transactionId: null, dueDate: { lte: cutoff } },
-            data: { paidAt: new Date() },
-          })
-          await prisma.loanPayment.updateMany({
-            where: { loanId: id, transactionId: null, dueDate: { gt: cutoff } },
-            data: { paidAt: null },
-          })
+        if (data.paidUntil !== undefined) {
+          if (data.paidUntil === null) {
+            await tx.loanPayment.updateMany({
+              where: { loanId: id, transactionId: null },
+              data: { paidAt: null },
+            })
+          } else {
+            const cutoff = new Date(data.paidUntil)
+            await tx.loanPayment.updateMany({
+              where: { loanId: id, transactionId: null, dueDate: { lte: cutoff } },
+              data: { paidAt: new Date() },
+            })
+            await tx.loanPayment.updateMany({
+              where: { loanId: id, transactionId: null, dueDate: { gt: cutoff } },
+              data: { paidAt: null },
+            })
+          }
         }
-      }
+
+        return updated
+      })
 
       return NextResponse.json(loan)
     }
