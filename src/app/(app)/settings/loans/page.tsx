@@ -64,7 +64,7 @@ function LoanDialog({
           loanType: loan.loanType,
           principal: loan.principal.toString(),
           interestRate: (loan.interestRate * 100).toFixed(3),
-          initialRepaymentRate: loan.initialRepaymentRate > 0 ? (loan.initialRepaymentRate * 100).toFixed(3) : '',
+          initialRepaymentRate: loan.initialRepaymentRate != null ? (loan.initialRepaymentRate * 100).toFixed(3) : '',
           termMonths: loan.termMonths.toString(),
           startDate: new Date(loan.startDate).toISOString().slice(0, 10),
           paidUntil: loan.paidUntil
