@@ -24,6 +24,7 @@ interface LoanForm {
   initialRepaymentRate: string
   termMonths: string
   startDate: string
+  paidUntil: string
   accountId: string
   categoryId: string
   notes: string
@@ -37,6 +38,7 @@ const EMPTY: LoanForm = {
   initialRepaymentRate: '',
   termMonths: '',
   startDate: new Date().toISOString().slice(0, 10),
+  paidUntil: '',
   accountId: '',
   categoryId: '',
   notes: '',
@@ -65,6 +67,9 @@ function LoanDialog({
           initialRepaymentRate: loan.initialRepaymentRate > 0 ? (loan.initialRepaymentRate * 100).toFixed(3) : '',
           termMonths: loan.termMonths.toString(),
           startDate: new Date(loan.startDate).toISOString().slice(0, 10),
+          paidUntil: loan.paidUntil
+            ? new Date(loan.paidUntil).toISOString().slice(0, 10)
+            : '',
           accountId: loan.accountId ?? '',
           categoryId: loan.categoryId ?? '',
           notes: loan.notes ?? '',
@@ -110,6 +115,7 @@ function LoanDialog({
       : 0,
     termMonths: parseInt(form.termMonths),
     startDate: form.startDate,
+    paidUntil: form.paidUntil || null,
     accountId: form.accountId || null,
     categoryId: form.categoryId || null,
     notes: form.notes || null,
@@ -223,6 +229,19 @@ function LoanDialog({
                 value={form.startDate}
                 onChange={e => set('startDate', e.target.value)}
               />
+            </div>
+
+            <div className="col-span-2 space-y-1.5">
+              <Label>Bezahlt bis</Label>
+              <Input
+                type="date"
+                value={form.paidUntil}
+                min={form.startDate}
+                onChange={e => set('paidUntil', e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Alle Raten bis zu diesem Datum werden ohne Buchung als bezahlt markiert.
+              </p>
             </div>
 
             {form.loanType === 'ANNUITAETENDARLEHEN' && (
