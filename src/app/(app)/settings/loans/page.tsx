@@ -69,10 +69,13 @@ function LoanDialog({
     if (!node) return
     // Restore value in case useEffect already ran before portal mounted
     node.value = paidUntilInitValRef.current
-    // Native listeners catch Safari's date picker (React synthetic onChange misses it)
+    // Native listeners catch Safari's date picker (React synthetic onChange misses it).
+    // blur fires before the Speichern button click handler runs, so it catches
+    // the case where the user types a date and immediately clicks Speichern.
     const handler = () => setPaidUntilDraft(node.value)
     node.addEventListener('change', handler)
     node.addEventListener('input', handler)
+    node.addEventListener('blur', handler)
   }, [])
 
   useEffect(() => {
@@ -141,7 +144,9 @@ function LoanDialog({
       : 0,
     termMonths: parseInt(form.termMonths),
     startDate: form.startDate,
-    paidUntil: paidUntilDraft || null,
+    // paidUntilDraft is updated by native events; fall back to direct DOM read
+    // in case blur/change hadn't fired yet (e.g. keyboard entry without tabbing away).
+    paidUntil: paidUntilDraft || paidUntilNodeRef.current?.value || null,
     accountId: form.accountId || null,
     categoryId: form.categoryId || null,
     notes: form.notes || null,
