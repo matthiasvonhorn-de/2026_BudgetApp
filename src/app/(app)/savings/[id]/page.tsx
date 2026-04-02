@@ -28,7 +28,7 @@ export default function SavingsDetailPage() {
   const qc = useQueryClient()
   const fmt = useFormatCurrency()
 
-  const [viewYears, setViewYears] = useState(5)
+  const [viewYears, setViewYears] = useState<number | null>(5)
   const [paidUntilDraft, setPaidUntilDraft] = useState('')
   const paidUntilInitValRef = useRef('')
   const paidUntilNodeRef = useRef<HTMLInputElement | null>(null)
@@ -91,12 +91,15 @@ export default function SavingsDetailPage() {
   const account = cfg.account
   const entries: any[] = cfg.entries ?? []
 
-  const cutoffDate = new Date()
-  cutoffDate.setFullYear(cutoffDate.getFullYear() + viewYears)
-
-  const visibleEntries = entries.filter(
-    (e: any) => new Date(e.dueDate) <= cutoffDate || e.paidAt !== null
-  )
+  const visibleEntries = viewYears === null
+    ? entries
+    : (() => {
+        const cutoffDate = new Date()
+        cutoffDate.setFullYear(cutoffDate.getFullYear() + viewYears)
+        return entries.filter(
+          (e: any) => new Date(e.dueDate) <= cutoffDate || e.paidAt !== null
+        )
+      })()
 
   function handlePayUntil() {
     const val = paidUntilDraft || paidUntilNodeRef.current?.value
@@ -155,7 +158,7 @@ export default function SavingsDetailPage() {
         <h2 className="text-base font-semibold flex-1">Zahlungsplan</h2>
         <div className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Anzeige:</span>
-          {[1, 2, 5, 10].map(y => (
+          {([1, 2, 5, 10] as const).map(y => (
             <button
               key={y}
               onClick={() => setViewYears(y)}
@@ -164,6 +167,12 @@ export default function SavingsDetailPage() {
               {y} J.
             </button>
           ))}
+          <button
+            onClick={() => setViewYears(null)}
+            className={`px-2 py-0.5 rounded text-xs border ${viewYears === null ? 'bg-primary text-primary-foreground border-primary' : 'border-input hover:bg-muted'}`}
+          >
+            Alle
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Bezahlt bis:</span>
