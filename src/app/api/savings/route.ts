@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
-import { generateSavingsSchedule } from '@/lib/savings/schedule'
+import { generateSavingsSchedule, addMonths } from '@/lib/savings/schedule'
 
 const CreateSchema = z.object({
   name: z.string().min(1),
@@ -19,6 +19,19 @@ const CreateSchema = z.object({
   categoryId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 })
+
+/**
+ * For fixed-term plans: use termMonths exactly.
+ * For unlimited plans: generate from startDate through today + 24 months,
+ * so past history is covered and there are always at least 24 months ahead.
+ */
+function computeScheduleMonths(startDate: Date, termMonths: number | null): number {
+  if (termMonths !== null) return termMonths
+  const horizon = addMonths(new Date(), 24)
+  const diffMs = Math.max(0, horizon.getTime() - startDate.getTime())
+  const months = Math.ceil(diffMs / (30.44 * 24 * 60 * 60 * 1000))
+  return Math.max(months, 24)
+}
 
 export async function GET() {
   try {
@@ -75,8 +88,10 @@ export async function POST(request: Request) {
       ? (data.contributionFrequency ?? null)
       : null
 
+    const scheduleMonths = computeScheduleMonths(startDate, data.termMonths ?? null)
+
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Account anlegen
+      // 1. Account anlegen (currentBalance wird ggf. nach Initialisierung aktualisiert)
       const account = await tx.account.create({
         data: {
           name: data.name,
@@ -114,7 +129,7 @@ export async function POST(request: Request) {
         interestRate: data.interestRate,
         interestFrequency: data.interestFrequency,
         startDate,
-        termMonths: data.termMonths ?? null,
+        termMonths: scheduleMonths,
       })
 
       await tx.savingsEntry.createMany({
@@ -127,6 +142,33 @@ export async function POST(request: Request) {
           scheduledBalance: row.scheduledBalance,
         })),
       })
+
+      // 4. Vergangene Einträge initialisieren:
+      //    paidAt wird gesetzt, aber KEINE Transaktionen angelegt.
+      //    Der Kontostand wird direkt auf den kumulierten Saldo gesetzt.
+      const today = new Date()
+      today.setHours(23, 59, 59, 999)
+
+      const pastRows = schedule
+        .filter(row => row.dueDate <= today)
+        .sort((a, b) =>
+          a.dueDate.getTime() - b.dueDate.getTime() ||
+          (a.entryType === 'INTEREST' ? -1 : 1)
+        )
+
+      if (pastRows.length > 0) {
+        await tx.savingsEntry.updateMany({
+          where: { savingsConfigId: config.id, dueDate: { lte: today } },
+          data: { paidAt: new Date() },
+          // transactionId bleibt null → kennzeichnet "initialisiert ohne Buchung"
+        })
+
+        const lastRow = pastRows[pastRows.length - 1]
+        await tx.account.update({
+          where: { id: account.id },
+          data: { currentBalance: lastRow.scheduledBalance },
+        })
+      }
 
       return { account, config }
     })

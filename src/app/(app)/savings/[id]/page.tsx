@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -30,13 +30,11 @@ export default function SavingsDetailPage() {
 
   const [viewYears, setViewYears] = useState<number | null>(5)
   const [paidUntilDraft, setPaidUntilDraft] = useState('')
-  const paidUntilInitValRef = useRef('')
   const paidUntilNodeRef = useRef<HTMLInputElement | null>(null)
 
   const paidUntilCallbackRef = useCallback((node: HTMLInputElement | null) => {
     paidUntilNodeRef.current = node
     if (!node) return
-    node.value = paidUntilInitValRef.current
     const handler = () => setPaidUntilDraft(node.value)
     node.addEventListener('change', handler)
     node.addEventListener('input', handler)
@@ -91,15 +89,15 @@ export default function SavingsDetailPage() {
   const account = cfg.account
   const entries: any[] = cfg.entries ?? []
 
-  const visibleEntries = viewYears === null
+  const cutoffDate = viewYears === null ? null : (() => {
+    const d = new Date()
+    d.setFullYear(d.getFullYear() + viewYears)
+    return d
+  })()
+
+  const visibleEntries = cutoffDate === null
     ? entries
-    : (() => {
-        const cutoffDate = new Date()
-        cutoffDate.setFullYear(cutoffDate.getFullYear() + viewYears)
-        return entries.filter(
-          (e: any) => new Date(e.dueDate) <= cutoffDate || e.paidAt !== null
-        )
-      })()
+    : entries.filter((e: any) => new Date(e.dueDate) <= cutoffDate || e.paidAt !== null)
 
   function handlePayUntil() {
     const val = paidUntilDraft || paidUntilNodeRef.current?.value
@@ -214,6 +212,8 @@ export default function SavingsDetailPage() {
             {visibleEntries.map((entry: any) => {
               const isInterest = entry.entryType === 'INTEREST'
               const isPaid = entry.paidAt !== null
+              // initialized = marked paid during account creation, no transaction record
+              const isInitialized = isPaid && entry.transactionId === null
               return (
                 <tr key={entry.id} className={`border-t ${isInterest ? 'bg-muted/20' : ''}`}>
                   <td className="p-3 text-muted-foreground">
@@ -233,7 +233,11 @@ export default function SavingsDetailPage() {
                     {fmt(entry.scheduledBalance)}
                   </td>
                   <td className="p-3 text-right">
-                    {isPaid ? (
+                    {isInitialized ? (
+                      <span className="text-xs text-muted-foreground">
+                        ✓ initialisiert
+                      </span>
+                    ) : isPaid ? (
                       <div className="flex items-center justify-end gap-2">
                         <span className="text-xs text-muted-foreground">
                           ✓ {isInterest ? 'automatisch' : 'gebucht'}

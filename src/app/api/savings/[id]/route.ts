@@ -4,14 +4,12 @@ import { z } from 'zod'
 import { generateSavingsSchedule } from '@/lib/savings/schedule'
 
 const UpdateSchema = z.object({
-  // Metadaten
   name: z.string().min(1).optional(),
   color: z.string().optional(),
   accountNumber: z.string().nullable().optional(),
   linkedAccountId: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  // Nur Zinssatz darf nachträglich geändert werden (→ Neuberechnung INTEREST-Einträge)
   interestRate: z.number().min(0).optional(),
 })
 
@@ -31,62 +29,6 @@ export async function GET(
     })
     if (!config) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Lazy-extend schedule for unlimited savings plans when entries run out
-    if (config.termMonths === null) {
-      const lastEntry = config.entries[config.entries.length - 1]
-      const twoYearsFromNow = new Date()
-      twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2)
-
-      if (!lastEntry || lastEntry.dueDate <= twoYearsFromNow) {
-        const interestPeriodMonths =
-          config.interestFrequency === 'MONTHLY' ? 1
-          : config.interestFrequency === 'QUARTERLY' ? 3
-          : 12
-
-        const extendFrom = lastEntry
-          ? new Date(new Date(lastEntry.dueDate).setMonth(new Date(lastEntry.dueDate).getMonth() + interestPeriodMonths))
-          : config.startDate
-
-        const maxInterestPeriod = config.entries
-          .filter(e => e.entryType === 'INTEREST')
-          .reduce((m, e) => Math.max(m, e.periodNumber), 0)
-        const maxContribPeriod = config.entries
-          .filter(e => e.entryType === 'CONTRIBUTION')
-          .reduce((m, e) => Math.max(m, e.periodNumber), 0)
-
-        const extension = generateSavingsSchedule({
-          savingsType: config.account.type as 'SPARPLAN' | 'FESTGELD',
-          initialBalance: lastEntry?.scheduledBalance ?? config.initialBalance,
-          contributionAmount: config.contributionAmount,
-          contributionFrequency: config.contributionFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY' | null,
-          interestRate: config.interestRate,
-          interestFrequency: config.interestFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY',
-          startDate: extendFrom,
-          termMonths: 600,
-        })
-
-        if (extension.length > 0) {
-          await prisma.savingsEntry.createMany({
-            data: extension.map(row => ({
-              savingsConfigId: config.id,
-              entryType: row.entryType,
-              periodNumber: row.periodNumber + (row.entryType === 'INTEREST' ? maxInterestPeriod : maxContribPeriod),
-              dueDate: row.dueDate,
-              scheduledAmount: row.scheduledAmount,
-              scheduledBalance: row.scheduledBalance,
-            })),
-            skipDuplicates: true,
-          })
-
-          const extended = await prisma.savingsEntry.findMany({
-            where: { savingsConfigId: config.id },
-            orderBy: [{ dueDate: 'asc' }, { entryType: 'asc' }],
-          })
-          ;(config as any).entries = extended
-        }
-      }
-    }
-
     const paidEntries = config.entries.filter(e => e.paidAt !== null)
     const totalInterest = paidEntries
       .filter(e => e.entryType === 'INTEREST')
@@ -97,6 +39,7 @@ export async function GET(
     const nextUnpaidContrib = config.entries.find(
       e => e.entryType === 'CONTRIBUTION' && e.paidAt === null
     )
+    const lastEntry = config.entries[config.entries.length - 1]
 
     return NextResponse.json({
       ...config,
@@ -104,6 +47,7 @@ export async function GET(
         totalInterestPaid: Math.round(totalInterest * 100) / 100,
         totalContributionsPaid: Math.round(totalContributions * 100) / 100,
         nextDueDate: nextUnpaidContrib?.dueDate ?? null,
+        lastScheduledDate: lastEntry?.dueDate ?? null,
         totalEntries: config.entries.length,
         paidEntries: paidEntries.length,
       },
@@ -137,7 +81,6 @@ export async function PUT(
       Math.abs(data.interestRate - config.interestRate) > 1e-9
 
     await prisma.$transaction(async (tx) => {
-      // Account-Name und Farbe aktualisieren
       if (data.name !== undefined || data.color !== undefined) {
         await tx.account.update({
           where: { id },
@@ -148,7 +91,6 @@ export async function PUT(
         })
       }
 
-      // SavingsConfig Metadaten
       await tx.savingsConfig.update({
         where: { accountId: id },
         data: {
@@ -162,20 +104,16 @@ export async function PUT(
 
       if (!interestRateChanged) return
 
-      // Zinssatz geändert: unbezahlte INTEREST-Einträge neu berechnen
       const newRate = data.interestRate!
 
-      // Letzten bezahlten INTEREST-Eintrag finden (Startpunkt)
       const lastPaidInterest = config.entries
         .filter(e => e.entryType === 'INTEREST' && e.paidAt !== null)
         .sort((a, b) => b.periodNumber - a.periodNumber)[0]
 
-      // Alle unbezahlten INTEREST-Einträge löschen
       await tx.savingsEntry.deleteMany({
         where: { savingsConfigId: config.id, entryType: 'INTEREST', paidAt: null },
       })
 
-      // Saldo nach dem letzten bezahlten Eintrag ermitteln
       const allPaidSorted = config.entries
         .filter(e => e.paidAt !== null)
         .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime() || (a.entryType === 'INTEREST' ? -1 : 1))
@@ -183,17 +121,19 @@ export async function PUT(
         ? allPaidSorted[allPaidSorted.length - 1].scheduledBalance
         : config.initialBalance
 
-      // Startdatum für neue Einträge = Tag nach dem letzten bezahlten Eintrag
       const firstUnpaidContrib = config.entries
         .filter(e => e.entryType === 'CONTRIBUTION' && e.paidAt === null)
         .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]
       const rebuildFrom = firstUnpaidContrib?.dueDate ?? lastPaidInterest?.dueDate ?? config.startDate
 
-      // Verbleibende Monate berechnen
-      const totalMonths = config.termMonths ?? 60
-      const elapsedMs = rebuildFrom.getTime() - config.startDate.getTime()
-      const elapsedMonths = Math.round(elapsedMs / (1000 * 60 * 60 * 24 * 30.44))
-      const remainingMonths = Math.max(totalMonths - elapsedMonths, 0)
+      // For unlimited plans: rebuild as many months as there are unpaid contributions remaining
+      const unpaidContribs = config.entries.filter(e => e.entryType === 'CONTRIBUTION' && e.paidAt === null)
+      const lastEntry = config.entries[config.entries.length - 1]
+      const remainingMonths = config.termMonths !== null
+        ? Math.max(Math.round((lastEntry?.dueDate.getTime() ?? rebuildFrom.getTime()) - rebuildFrom.getTime()) / (30.44 * 24 * 60 * 60 * 1000), 0)
+        : unpaidContribs.length > 0
+          ? Math.round((unpaidContribs[unpaidContribs.length - 1].dueDate.getTime() - rebuildFrom.getTime()) / (30.44 * 24 * 60 * 60 * 1000)) + 1
+          : 0
 
       if (remainingMonths > 0) {
         const newSchedule = generateSavingsSchedule({
@@ -204,7 +144,7 @@ export async function PUT(
           interestRate: newRate,
           interestFrequency: config.interestFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY',
           startDate: rebuildFrom,
-          termMonths: remainingMonths,
+          termMonths: remainingMonths + 1,
         })
 
         const interestOnly = newSchedule.filter(r => r.entryType === 'INTEREST')
@@ -221,14 +161,8 @@ export async function PUT(
           })),
         })
 
-        // scheduledBalance der unbezahlten CONTRIBUTION-Einträge neu berechnen
-        const unpaidContribs = config.entries
-          .filter(e => e.entryType === 'CONTRIBUTION' && e.paidAt === null)
-          .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
-
-        // Alle neuen Einträge zusammenführen und Saldo neu durchrechnen
         const allUnpaid = [
-          ...interestOnly.map(r => ({ ...r, id: null })),
+          ...interestOnly.map(r => ({ ...r, id: null as string | null })),
           ...unpaidContribs.map(r => ({ entryType: 'CONTRIBUTION' as const, dueDate: r.dueDate, scheduledAmount: r.scheduledAmount, id: r.id })),
         ].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime() || (a.entryType === 'INTEREST' ? -1 : 1))
 

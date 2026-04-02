@@ -9,7 +9,7 @@ export interface SavingsScheduleParams {
   interestRate: number          // p.a. als Dezimal
   interestFrequency: SavingsFrequency
   startDate: Date
-  termMonths: number | null     // null = 60 Monate (Default)
+  termMonths: number            // required – caller must compute the right value
 }
 
 export interface SavingsScheduleRow {
@@ -20,14 +20,14 @@ export interface SavingsScheduleRow {
   scheduledBalance: number
 }
 
-function periodsPerYear(freq: SavingsFrequency): number {
-  return freq === 'MONTHLY' ? 12 : freq === 'QUARTERLY' ? 4 : 1
-}
-
-function addMonths(date: Date, months: number): Date {
+export function addMonths(date: Date, months: number): Date {
   const d = new Date(date)
   d.setMonth(d.getMonth() + months)
   return d
+}
+
+function periodsPerYear(freq: SavingsFrequency): number {
+  return freq === 'MONTHLY' ? 12 : freq === 'QUARTERLY' ? 4 : 1
 }
 
 function toMonthKey(date: Date): string {
@@ -46,29 +46,24 @@ export function generateSavingsSchedule(params: SavingsScheduleParams): SavingsS
     termMonths,
   } = params
 
-  const months = termMonths ?? 600
   const interestPeriodMonths = 12 / periodsPerYear(interestFrequency)
   const contribPeriodMonths = contributionFrequency
     ? 12 / periodsPerYear(contributionFrequency)
     : null
 
-  // Build a set of (monthKey, type) for all scheduled dates
   type ScheduledEvent = { date: Date; type: SavingsEntryType }
   const events: ScheduledEvent[] = []
 
-  // Interest events
-  for (let m = 0; m < months; m += interestPeriodMonths) {
+  for (let m = 0; m < termMonths; m += interestPeriodMonths) {
     events.push({ date: addMonths(startDate, m), type: 'INTEREST' })
   }
 
-  // Contribution events (only for SPARPLAN)
   if (savingsType === 'SPARPLAN' && contribPeriodMonths !== null) {
-    for (let m = 0; m < months; m += contribPeriodMonths) {
+    for (let m = 0; m < termMonths; m += contribPeriodMonths) {
       events.push({ date: addMonths(startDate, m), type: 'CONTRIBUTION' })
     }
   }
 
-  // Sort: by date, then INTEREST before CONTRIBUTION on same date
   events.sort((a, b) => {
     const diff = a.date.getTime() - b.date.getTime()
     if (diff !== 0) return diff
@@ -78,11 +73,7 @@ export function generateSavingsSchedule(params: SavingsScheduleParams): SavingsS
   const rows: SavingsScheduleRow[] = []
   let balance = initialBalance
   const interestPeriodRate = interestRate / periodsPerYear(interestFrequency)
-
-  // Track period numbers per type separately
   const counters: Record<SavingsEntryType, number> = { INTEREST: 0, CONTRIBUTION: 0 }
-
-  // Deduplicate: same date+type can appear once (floating point period steps)
   const seen = new Set<string>()
 
   for (const event of events) {
@@ -91,13 +82,9 @@ export function generateSavingsSchedule(params: SavingsScheduleParams): SavingsS
     seen.add(key)
 
     counters[event.type]++
-    let amount: number
-
-    if (event.type === 'INTEREST') {
-      amount = Math.round(balance * interestPeriodRate * 100) / 100
-    } else {
-      amount = contributionAmount
-    }
+    const amount = event.type === 'INTEREST'
+      ? Math.round(balance * interestPeriodRate * 100) / 100
+      : contributionAmount
 
     balance = Math.round((balance + amount) * 100) / 100
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -216,6 +216,50 @@ export default function SavingsEditPage() {
         >
           {mutation.isPending ? '…' : 'Speichern'}
         </Button>
+      </div>
+
+      {/* Zahlungsplan verlängern — nur für unbegrenzte Pläne */}
+      {data.termMonths === null && <ExtendSection id={id} lastDate={data.stats?.lastScheduledDate ?? null} />}
+    </div>
+  )
+}
+
+function ExtendSection({ id, lastDate }: { id: string; lastDate: string | null }) {
+  const qc = useQueryClient()
+  const extendMutation = useMutation({
+    mutationFn: (months: number) =>
+      fetch(`/api/savings/${id}/extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ months }),
+      }).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['savings', id] })
+      toast.success(`${res.added} neue Einträge generiert`)
+    },
+    onError: () => toast.error('Fehler beim Verlängern'),
+  })
+
+  return (
+    <div className="mt-8 border-t pt-6">
+      <h2 className="text-sm font-semibold mb-1">Zahlungsplan verlängern</h2>
+      {lastDate && (
+        <p className="text-xs text-muted-foreground mb-3">
+          Einträge generiert bis: {new Date(lastDate).toLocaleDateString('de-DE')}
+        </p>
+      )}
+      <div className="flex gap-2">
+        {[12, 24, 60].map(m => (
+          <Button
+            key={m}
+            variant="outline"
+            size="sm"
+            onClick={() => extendMutation.mutate(m)}
+            disabled={extendMutation.isPending}
+          >
+            {extendMutation.isPending ? '…' : `+ ${m} Monate`}
+          </Button>
+        ))}
       </div>
     </div>
   )
