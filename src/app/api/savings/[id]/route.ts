@@ -31,6 +31,62 @@ export async function GET(
     })
     if (!config) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+    // Lazy-extend schedule for unlimited savings plans when entries run out
+    if (config.termMonths === null) {
+      const lastEntry = config.entries[config.entries.length - 1]
+      const twoYearsFromNow = new Date()
+      twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2)
+
+      if (!lastEntry || lastEntry.dueDate <= twoYearsFromNow) {
+        const interestPeriodMonths =
+          config.interestFrequency === 'MONTHLY' ? 1
+          : config.interestFrequency === 'QUARTERLY' ? 3
+          : 12
+
+        const extendFrom = lastEntry
+          ? new Date(new Date(lastEntry.dueDate).setMonth(new Date(lastEntry.dueDate).getMonth() + interestPeriodMonths))
+          : config.startDate
+
+        const maxInterestPeriod = config.entries
+          .filter(e => e.entryType === 'INTEREST')
+          .reduce((m, e) => Math.max(m, e.periodNumber), 0)
+        const maxContribPeriod = config.entries
+          .filter(e => e.entryType === 'CONTRIBUTION')
+          .reduce((m, e) => Math.max(m, e.periodNumber), 0)
+
+        const extension = generateSavingsSchedule({
+          savingsType: config.account.type as 'SPARPLAN' | 'FESTGELD',
+          initialBalance: lastEntry?.scheduledBalance ?? config.initialBalance,
+          contributionAmount: config.contributionAmount,
+          contributionFrequency: config.contributionFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY' | null,
+          interestRate: config.interestRate,
+          interestFrequency: config.interestFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY',
+          startDate: extendFrom,
+          termMonths: 600,
+        })
+
+        if (extension.length > 0) {
+          await prisma.savingsEntry.createMany({
+            data: extension.map(row => ({
+              savingsConfigId: config.id,
+              entryType: row.entryType,
+              periodNumber: row.periodNumber + (row.entryType === 'INTEREST' ? maxInterestPeriod : maxContribPeriod),
+              dueDate: row.dueDate,
+              scheduledAmount: row.scheduledAmount,
+              scheduledBalance: row.scheduledBalance,
+            })),
+            skipDuplicates: true,
+          })
+
+          const extended = await prisma.savingsEntry.findMany({
+            where: { savingsConfigId: config.id },
+            orderBy: [{ dueDate: 'asc' }, { entryType: 'asc' }],
+          })
+          ;(config as any).entries = extended
+        }
+      }
+    }
+
     const paidEntries = config.entries.filter(e => e.paidAt !== null)
     const totalInterest = paidEntries
       .filter(e => e.entryType === 'INTEREST')

@@ -46,7 +46,7 @@ export function generateSavingsSchedule(params: SavingsScheduleParams): SavingsS
     termMonths,
   } = params
 
-  const months = termMonths ?? 60
+  const months = termMonths ?? 600
   const interestPeriodMonths = 12 / periodsPerYear(interestFrequency)
   const contribPeriodMonths = contributionFrequency
     ? 12 / periodsPerYear(contributionFrequency)
