@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -29,17 +29,6 @@ export default function SavingsDetailPage() {
   const fmt = useFormatCurrency()
 
   const [viewYears, setViewYears] = useState<number | null>(5)
-  const [paidUntilDraft, setPaidUntilDraft] = useState('')
-  const paidUntilNodeRef = useRef<HTMLInputElement | null>(null)
-
-  const paidUntilCallbackRef = useCallback((node: HTMLInputElement | null) => {
-    paidUntilNodeRef.current = node
-    if (!node) return
-    const handler = () => setPaidUntilDraft(node.value)
-    node.addEventListener('change', handler)
-    node.addEventListener('input', handler)
-    node.addEventListener('blur', handler)
-  }, [])
 
   const { data, isLoading } = useQuery({
     queryKey: ['savings', id],
@@ -98,12 +87,6 @@ export default function SavingsDetailPage() {
   const visibleEntries = cutoffDate === null
     ? entries
     : entries.filter((e: any) => new Date(e.dueDate) <= cutoffDate || e.paidAt !== null)
-
-  function handlePayUntil() {
-    const val = paidUntilDraft || paidUntilNodeRef.current?.value
-    if (!val) { toast.error('Bitte ein Datum eingeben'); return }
-    payMutation.mutate(val)
-  }
 
   return (
     <div className="p-6 max-w-4xl">
@@ -171,21 +154,6 @@ export default function SavingsDetailPage() {
           >
             Alle
           </button>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Bezahlt bis:</span>
-          <input
-            ref={paidUntilCallbackRef}
-            type="date"
-            className="h-8 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-          <Button
-            size="sm"
-            onClick={handlePayUntil}
-            disabled={payMutation.isPending}
-          >
-            {payMutation.isPending ? '…' : 'Buchen'}
-          </Button>
         </div>
       </div>
 

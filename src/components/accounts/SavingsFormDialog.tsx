@@ -28,6 +28,7 @@ interface SavingsForm {
   linkedAccountId: string
   categoryId: string
   notes: string
+  initializedUntil: string
 }
 
 const EMPTY: SavingsForm = {
@@ -45,6 +46,7 @@ const EMPTY: SavingsForm = {
   linkedAccountId: '',
   categoryId: '',
   notes: '',
+  initializedUntil: '',
 }
 
 const FREQ_LABELS = {
@@ -70,6 +72,16 @@ export function SavingsFormDialog({ open, onOpenChange }: Props) {
     if (!node) return
     node.value = startDateInitRef.current
     const handler = () => set('startDate', node.value)
+    node.addEventListener('change', handler)
+    node.addEventListener('input', handler)
+    node.addEventListener('blur', handler)
+  }, [])
+
+  const initUntilNodeRef = useRef<HTMLInputElement | null>(null)
+  const initUntilCallbackRef = useCallback((node: HTMLInputElement | null) => {
+    initUntilNodeRef.current = node
+    if (!node) return
+    const handler = () => set('initializedUntil', node.value)
     node.addEventListener('change', handler)
     node.addEventListener('input', handler)
     node.addEventListener('blur', handler)
@@ -104,6 +116,7 @@ export function SavingsFormDialog({ open, onOpenChange }: Props) {
   const mutation = useMutation({
     mutationFn: async () => {
       const startDate = startDateNodeRef.current?.value || form.startDate
+      const initUntilVal = initUntilNodeRef.current?.value || form.initializedUntil
       const body = {
         name: form.name,
         savingsType: form.savingsType,
@@ -121,6 +134,7 @@ export function SavingsFormDialog({ open, onOpenChange }: Props) {
           categoryId: form.categoryId || null,
         }),
         notes: form.notes || null,
+        initializedUntil: initUntilVal || null,
       }
       const res = await fetch('/api/savings', {
         method: 'POST',
@@ -326,6 +340,19 @@ export function SavingsFormDialog({ open, onOpenChange }: Props) {
               )}
             </>
           )}
+
+          {/* Bezahlt bis (Initialisierung) */}
+          <div className="space-y-1.5">
+            <Label>Bezahlt bis (Initialisierung)</Label>
+            <input
+              ref={initUntilCallbackRef}
+              type="date"
+              className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            />
+            <p className="text-xs text-muted-foreground">
+              Einträge bis zu diesem Datum werden ohne Transaktion als bezahlt markiert.
+            </p>
+          </div>
 
           {/* Notizen */}
           <div className="space-y-1.5">

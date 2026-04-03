@@ -2,7 +2,7 @@
 import { test, expect } from '@playwright/test'
 import {
   apiCreateSavings, apiDeleteSavings, apiCreateGiro, apiDeleteAccount,
-  today, monthsFromNow,
+  today, monthsFromNow, monthsAgo,
 } from './helpers'
 
 const BASE = 'http://localhost:3000'
@@ -75,36 +75,7 @@ test('5.2 Zinsen werden automatisch mitgebucht', async ({ page }) => {
   await apiDeleteSavings(id).catch(() => {}) // best-effort cleanup (test body)
 })
 
-test('5.3 Bezahlt-bis-Datum bucht mehrere Einträge', async ({ page }) => {
-  const id = await apiCreateSavings({
-    name: `PayUntil-${Date.now()}`,
-    savingsType: 'SPARPLAN',
-    initialBalance: 0,
-    interestRate: 0.03,
-    interestFrequency: 'MONTHLY',
-    startDate: today(),
-    termMonths: null,
-    contributionAmount: 100,
-    contributionFrequency: 'MONTHLY',
-  })
-
-  await page.goto(`/savings/${id}`)
-
-  // "Bezahlt bis" auf heute+2 Monate setzen
-  const twoMonths = monthsFromNow(2)
-  const dateInput = page.locator('input[type="date"]').last()
-  await dateInput.fill(twoMonths)
-  await dateInput.dispatchEvent('change')
-
-  await page.getByRole('button', { name: 'Buchen' }).click()
-
-  // Toast zeigt mind. 2 gebuchte Einträge
-  await expect(page.getByText(/[2-9]+ Eintrag|[2-9]+ Eintr/)).toBeVisible({ timeout: 8000 })
-
-  await apiDeleteSavings(id).catch(() => {})
-})
-
-test('5.4 Rückgängig-Link stellt Zeile wieder her', async ({ page }) => {
+test('5.3 Rückgängig-Link stellt Zeile wieder her', async ({ page }) => {
   const id = await apiCreateSavings({
     name: `Unpay-${Date.now()}`,
     savingsType: 'SPARPLAN',
@@ -132,17 +103,7 @@ test('5.4 Rückgängig-Link stellt Zeile wieder her', async ({ page }) => {
   await apiDeleteSavings(id).catch(() => {})
 })
 
-test('5.5 Buchen ohne Datum zeigt Fehler-Toast', async ({ page }) => {
-  await page.goto(`/savings/${accountId}`)
-  // Sicherstellen dass der Datums-Input wirklich leer ist
-  const dateInput = page.locator('input[type="date"]').last()
-  await dateInput.fill('')
-  await dateInput.dispatchEvent('change')
-  await page.getByRole('button', { name: 'Buchen' }).click()
-  await expect(page.getByText('Bitte ein Datum eingeben')).toBeVisible()
-})
-
-test('5.6 Girokonto-Saldo sinkt bei Contribution-Buchung', async ({ page }) => {
+test('5.4 Girokonto-Saldo sinkt bei Contribution-Buchung', async ({ page }) => {
   // Girokonto-Saldo vorher
   const before = await apiGetAccounts()
   const giroBefore = before.find(a => a.id === giroId)?.currentBalance ?? 0
@@ -157,4 +118,74 @@ test('5.6 Girokonto-Saldo sinkt bei Contribution-Buchung', async ({ page }) => {
   const giroAfter = after.find(a => a.id === giroId)?.currentBalance ?? 0
 
   expect(giroAfter).toBeLessThan(giroBefore)
+})
+
+test('5.5 Kein "Bezahlt bis" Input auf der Detailseite', async ({ page }) => {
+  // Die "Bezahlt bis"-Funktion wurde aus der Detailseite entfernt — nur noch bei Anlage verfügbar
+  await page.goto(`/savings/${accountId}`)
+  // Kein Datum-Input mehr im Header-Bereich
+  const dateInputs = page.locator('input[type="date"]')
+  await expect(dateInputs).toHaveCount(0)
+  // Kein "Buchen"-Button (nur "Bezahlen" pro Zeile erlaubt)
+  await expect(page.getByRole('button', { name: 'Buchen' })).toHaveCount(0)
+})
+
+test('5.6 API: initializedUntil markiert Einträge ohne Transaktionen', async () => {
+  const twoMonthsAgo = monthsAgo(2)
+  const id = await apiCreateSavings({
+    name: `InitUntil-${Date.now()}`,
+    savingsType: 'SPARPLAN',
+    initialBalance: 500,
+    interestRate: 0.03,
+    interestFrequency: 'MONTHLY',
+    startDate: monthsAgo(6),
+    termMonths: null,
+    contributionAmount: 100,
+    contributionFrequency: 'MONTHLY',
+    initializedUntil: twoMonthsAgo,
+  })
+
+  const res = await fetch(`${BASE}/api/savings/${id}`)
+  const data = await res.json()
+
+  // Einträge bis einschließlich twoMonthsAgo: paidAt gesetzt, transactionId null
+  const initEntries = data.entries.filter((e: any) =>
+    e.paidAt !== null && e.transactionId === null
+  )
+  expect(initEntries.length).toBeGreaterThan(0)
+
+  // Keine echten Transaktionen: alle initialisierten Einträge haben transactionId === null
+  const withTransaction = data.entries.filter((e: any) => e.transactionId !== null)
+  expect(withTransaction.length).toBe(0)
+
+  await apiDeleteSavings(id).catch(() => {})
+})
+
+test('5.7 API: initializedUntil legt keine Gegenbuchung auf Girokonto an', async () => {
+  const giro2Id = await apiCreateGiro(`Giro-InitTest-${Date.now()}`)
+  const balanceBefore = (await (await fetch(`${BASE}/api/accounts`)).json())
+    .find((a: any) => a.id === giro2Id)?.currentBalance ?? 0
+
+  const id = await apiCreateSavings({
+    name: `InitGiro-${Date.now()}`,
+    savingsType: 'SPARPLAN',
+    initialBalance: 0,
+    interestRate: 0.03,
+    interestFrequency: 'MONTHLY',
+    startDate: monthsAgo(4),
+    termMonths: null,
+    contributionAmount: 200,
+    contributionFrequency: 'MONTHLY',
+    linkedAccountId: giro2Id,
+    initializedUntil: monthsAgo(1),
+  })
+
+  const balanceAfter = (await (await fetch(`${BASE}/api/accounts`)).json())
+    .find((a: any) => a.id === giro2Id)?.currentBalance ?? 0
+
+  // Girokonto-Saldo unverändert — keine Gegenbuchungen bei Initialisierung
+  expect(balanceAfter).toBe(balanceBefore)
+
+  await apiDeleteSavings(id).catch(() => {})
+  await apiDeleteAccount(giro2Id).catch(() => {})
 })

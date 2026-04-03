@@ -17,6 +17,7 @@ export interface SavingsCreatePayload {
   linkedAccountId?: string | null
   categoryId?: string | null
   notes?: string | null
+  initializedUntil?: string | null  // Initialisierungsdatum — keine Transaktionen
 }
 
 /** Legt ein Sparkonto via API an. Gibt die account.id zurück. */

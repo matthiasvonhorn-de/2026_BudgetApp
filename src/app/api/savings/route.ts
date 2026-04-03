@@ -18,6 +18,7 @@ const CreateSchema = z.object({
   linkedAccountId: z.string().nullable().optional(),
   categoryId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  initializedUntil: z.string().nullable().optional(), // initialization cutoff date — no transactions created
 })
 
 /**
@@ -144,13 +145,16 @@ export async function POST(request: Request) {
       })
 
       // 4. Vergangene Einträge initialisieren:
-      //    paidAt wird gesetzt, aber KEINE Transaktionen angelegt.
+      //    paidAt wird gesetzt, aber KEINE Transaktionen angelegt (auch keine Gegenbuchungen).
       //    Der Kontostand wird direkt auf den kumulierten Saldo gesetzt.
       const today = new Date()
       today.setHours(23, 59, 59, 999)
+      const initCutoff = data.initializedUntil
+        ? (() => { const d = new Date(data.initializedUntil!); d.setHours(23, 59, 59, 999); return d })()
+        : today
 
       const pastRows = schedule
-        .filter(row => row.dueDate <= today)
+        .filter(row => row.dueDate <= initCutoff)
         .sort((a, b) =>
           a.dueDate.getTime() - b.dueDate.getTime() ||
           (a.entryType === 'INTEREST' ? -1 : 1)
@@ -158,7 +162,7 @@ export async function POST(request: Request) {
 
       if (pastRows.length > 0) {
         await tx.savingsEntry.updateMany({
-          where: { savingsConfigId: config.id, dueDate: { lte: today } },
+          where: { savingsConfigId: config.id, dueDate: { lte: initCutoff } },
           data: { paidAt: new Date() },
           // transactionId bleibt null → kennzeichnet "initialisiert ohne Buchung"
         })
