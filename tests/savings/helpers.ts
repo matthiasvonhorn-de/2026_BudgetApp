@@ -62,10 +62,11 @@ export async function apiGetSavings(accountId: string): Promise<any> {
   return res.json()
 }
 
-/** ISO-Datum von heute + n Monaten als 'YYYY-MM-DD'. */
+/** ISO-Datum von heute + n Monaten als 'YYYY-MM-DD'. Setzt Tag auf 1 um Monats-Overflow zu vermeiden. */
 export function monthsFromNow(n: number): string {
   const d = new Date()
-  d.setMonth(d.getMonth() + n)
+  d.setUTCDate(1)
+  d.setUTCMonth(d.getUTCMonth() + n)
   return d.toISOString().slice(0, 10)
 }
 
