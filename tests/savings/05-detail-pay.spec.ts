@@ -2,8 +2,13 @@
 import { test, expect } from '@playwright/test'
 import {
   apiCreateSavings, apiDeleteSavings, apiCreateGiro, apiDeleteAccount,
-  apiGetSavings, today, monthsFromNow,
+  today, monthsFromNow,
 } from './helpers'
+
+const BASE = 'http://localhost:3000'
+async function apiGetAccounts(): Promise<{ id: string; currentBalance: number }[]> {
+  return fetch(`${BASE}/api/accounts`).then(r => r.json())
+}
 
 let accountId: string
 let giroId: string
@@ -67,7 +72,7 @@ test('5.2 Zinsen werden automatisch mitgebucht', async ({ page }) => {
   // INTEREST-Zeile vor der gebuchten CONTRIBUTION zeigt "automatisch"
   await expect(page.getByText('✓ automatisch').first()).toBeVisible()
 
-  await apiDeleteSavings(id).catch(() => {})
+  await apiDeleteSavings(id).catch(() => {}) // best-effort cleanup (test body)
 })
 
 test('5.3 Bezahlt-bis-Datum bucht mehrere Einträge', async ({ page }) => {
@@ -129,15 +134,18 @@ test('5.4 Rückgängig-Link stellt Zeile wieder her', async ({ page }) => {
 
 test('5.5 Buchen ohne Datum zeigt Fehler-Toast', async ({ page }) => {
   await page.goto(`/savings/${accountId}`)
-  // Datum-Input leer lassen, direkt Buchen klicken
+  // Sicherstellen dass der Datums-Input wirklich leer ist
+  const dateInput = page.locator('input[type="date"]').last()
+  await dateInput.fill('')
+  await dateInput.dispatchEvent('change')
   await page.getByRole('button', { name: 'Buchen' }).click()
   await expect(page.getByText('Bitte ein Datum eingeben')).toBeVisible()
 })
 
 test('5.6 Girokonto-Saldo sinkt bei Contribution-Buchung', async ({ page }) => {
   // Girokonto-Saldo vorher
-  const before = await fetch('http://localhost:3000/api/accounts').then(r => r.json())
-  const giroBefore = before.find((a: any) => a.id === giroId)?.currentBalance ?? 0
+  const before = await apiGetAccounts()
+  const giroBefore = before.find(a => a.id === giroId)?.currentBalance ?? 0
 
   await page.goto(`/savings/${accountId}`)
   await page.locator('.flex.items-center.gap-2').getByRole('button', { name: 'Alle' }).click()
@@ -145,8 +153,8 @@ test('5.6 Girokonto-Saldo sinkt bei Contribution-Buchung', async ({ page }) => {
   await expect(page.getByText('✓ gebucht').first()).toBeVisible()
 
   // Girokonto-Saldo nachher
-  const after = await fetch('http://localhost:3000/api/accounts').then(r => r.json())
-  const giroAfter = after.find((a: any) => a.id === giroId)?.currentBalance ?? 0
+  const after = await apiGetAccounts()
+  const giroAfter = after.find(a => a.id === giroId)?.currentBalance ?? 0
 
   expect(giroAfter).toBeLessThan(giroBefore)
 })
