@@ -1,5 +1,5 @@
 // tests/savings/01-create-sparplan.spec.ts
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { apiDeleteSavings, apiDeleteAccount, apiCreateGiro } from './helpers'
 
 // Sammelt alle während der Tests angelegten Account-IDs für Cleanup
@@ -18,23 +18,24 @@ test.afterAll(async () => {
   if (giroId) await apiDeleteAccount(giroId).catch(() => {})
 })
 
-async function openDialog(page: any) {
+async function openDialog(page: Page) {
   await page.goto('/accounts')
   await page.getByRole('button', { name: /Sparkonto \/ Festgeld/ }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
 }
 
-async function getCreatedId(page: any, name: string): Promise<string> {
+async function getCreatedId(page: Page, name: string): Promise<string> {
   // Findet den Link zur Detailseite des gerade angelegten Kontos
   const link = page.getByRole('link', { name: new RegExp(name) }).first()
   await expect(link).toBeVisible({ timeout: 5000 })
   const href = await link.getAttribute('href')
-  const id = href?.split('/').pop() ?? ''
+  const id = href?.split('/').pop()
+  if (!id) throw new Error(`Could not extract ID from href: ${href}`)
   return id
 }
 
 // Helper: findet Select-Trigger anhand des Label-Texts
-function selectNear(page: any, labelText: string) {
+function selectNear(page: Page, labelText: string) {
   return page.locator('div.space-y-1\\.5').filter({ has: page.locator(`label:has-text("${labelText}")`) }).locator('[data-slot="select-trigger"]').first()
 }
 
@@ -188,10 +189,10 @@ test('1.9 Mit IBAN', async ({ page }) => {
 
 test('1.10 Kategorie-Dropdown erscheint nur wenn Girokonto gewählt', async ({ page }) => {
   await openDialog(page)
-  // Ohne Girokonto: Buchungskategorie-Feld nicht sichtbar
+  // Ohne Girokonto: Buchungskategorie-Container existiert nicht im DOM
   await expect(
     page.locator('div.space-y-1\\.5').filter({ has: page.locator('label:has-text("Buchungskategorie")') })
-  ).not.toBeVisible()
+  ).toHaveCount(0)
   // Girokonto wählen
   const linkedSelect = selectNear(page, 'Verknüpftes Girokonto')
   await linkedSelect.click()
