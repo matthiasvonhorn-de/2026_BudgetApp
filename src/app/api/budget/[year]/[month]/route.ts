@@ -29,12 +29,15 @@ export async function GET(_: Request, { params }: { params: Promise<{ year: stri
     })
     const budgetMap = new Map(budgetEntries.map(e => [e.categoryId, e]))
 
+    const accountFilter = { isActive: true, type: { notIn: ['SPARPLAN', 'FESTGELD'] as const } }
+
     // Alle Transaktionen dieses Monats aggregiert nach Kategorie
     const activities = await prisma.transaction.groupBy({
       by: ['categoryId'],
       where: {
         date: { gte: startOfMonth, lte: endOfMonth },
         categoryId: { not: null },
+        account: accountFilter,
       },
       _sum: { amount: true },
     })
@@ -46,6 +49,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ year: stri
         date: { gte: startOfMonth, lte: endOfMonth },
         amount: { gt: 0 },
         type: 'INCOME',
+        account: accountFilter,
       },
       _sum: { amount: true },
     })
