@@ -55,8 +55,45 @@ export async function apiDeleteAccount(id: string): Promise<void> {
   if (!res.ok) throw new Error(`deleteAccount failed: ${await res.text()}`)
 }
 
+export interface SavingsEntry {
+  id: string
+  entryType: 'CONTRIBUTION' | 'INTEREST'
+  periodNumber: number
+  dueDate: string
+  scheduledAmount: number
+  scheduledBalance: number
+  paidAt: string | null
+  transactionId: string | null
+  giroTransactionId: string | null
+}
+
+export interface SavingsData {
+  id: string
+  accountId: string
+  interestRate: number
+  interestFrequency: string
+  contributionAmount: number
+  contributionFrequency: string | null
+  initialBalance: number
+  accountNumber: string | null
+  termMonths: number | null
+  linkedAccountId: string | null
+  categoryId: string | null
+  notes: string | null
+  account: { id: string; name: string; color: string; type: string; currentBalance: number }
+  entries: SavingsEntry[]
+  stats: {
+    totalInterestPaid: number
+    totalContributionsPaid: number
+    nextDueDate: string | null
+    lastScheduledDate: string | null
+    totalEntries: number
+    paidEntries: number
+  }
+}
+
 /** Holt SavingsConfig inkl. Entries für ein Konto. */
-export async function apiGetSavings(accountId: string): Promise<any> {
+export async function apiGetSavings(accountId: string): Promise<SavingsData> {
   const res = await fetch(`${BASE}/api/savings/${accountId}`)
   if (!res.ok) throw new Error(`getSavings failed: ${await res.text()}`)
   return res.json()

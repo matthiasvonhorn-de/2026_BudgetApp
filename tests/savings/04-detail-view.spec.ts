@@ -80,11 +80,15 @@ test('4.5 Älteste Einträge stehen oben (Sortierung)', async ({ page }) => {
   const lastDate = await rows.last().locator('td').first().textContent()
 
   // Datum ist im Format DD.MM.YYYY — in vergleichbares Format konvertieren
+  expect(firstDate, 'first row date should not be null').toBeTruthy()
+  expect(lastDate, 'last row date should not be null').toBeTruthy()
   const parseDE = (s: string) => {
-    const [d, m, y] = (s ?? '').trim().split('.')
+    const [d, m, y] = s.trim().split('.')
     return new Date(`${y}-${m}-${d}`)
   }
-  expect(parseDE(firstDate ?? '').getTime()).toBeLessThan(parseDE(lastDate ?? '').getTime())
+  const first = parseDE(firstDate!)
+  const last = parseDE(lastDate!)
+  expect(first.getTime(), 'first row should be older than last row').toBeLessThan(last.getTime())
 })
 
 test('4.6 Filter-Button wechselt aktiven Zustand (Highlight)', async ({ page }) => {
