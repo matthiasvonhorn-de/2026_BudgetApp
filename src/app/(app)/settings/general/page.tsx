@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Check, Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
 import { AccountFormDialog } from '@/components/accounts/AccountFormDialog'
+import { SavingsFormDialog } from '@/components/accounts/SavingsFormDialog'
 import { ACCOUNT_TYPE_LABELS } from '@/lib/utils'
 
 interface AccountRowProps {
@@ -80,6 +81,7 @@ export default function GeneralSettingsPage() {
   const qc = useQueryClient()
   const sensors = useSensors(useSensor(PointerSensor))
   const [accountDialog, setAccountDialog] = useState<{ open: boolean; account?: any }>({ open: false })
+  const [savingsDialog, setSavingsDialog] = useState(false)
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ['accounts'],
@@ -122,9 +124,14 @@ export default function GeneralSettingsPage() {
                 )
               )}
               {!isReordering && (
-                <Button size="sm" onClick={() => setAccountDialog({ open: true })}>
-                  <Plus className="h-4 w-4 mr-1" /> Konto hinzufügen
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setSavingsDialog(true)}>
+                    <Plus className="h-4 w-4 mr-1" /> Sparkonto / Festgeld
+                  </Button>
+                  <Button size="sm" onClick={() => setAccountDialog({ open: true })}>
+                    <Plus className="h-4 w-4 mr-1" /> Konto hinzufügen
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -191,6 +198,10 @@ export default function GeneralSettingsPage() {
         open={accountDialog.open}
         onOpenChange={(open) => setAccountDialog({ open })}
         account={accountDialog.account}
+      />
+      <SavingsFormDialog
+        open={savingsDialog}
+        onOpenChange={setSavingsDialog}
       />
     </div>
   )

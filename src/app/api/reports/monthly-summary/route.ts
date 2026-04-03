@@ -16,13 +16,14 @@ export async function GET(request: Request) {
       const startOfMonth = new Date(year, month - 1, 1)
       const endOfMonth = new Date(year, month, 0, 23, 59, 59)
 
+      const accountFilter = { isActive: true, type: { notIn: ['SPARPLAN', 'FESTGELD'] } }
       const [incomeResult, expenseResult] = await Promise.all([
         prisma.transaction.aggregate({
-          where: { date: { gte: startOfMonth, lte: endOfMonth }, type: 'INCOME' },
+          where: { date: { gte: startOfMonth, lte: endOfMonth }, type: 'INCOME', account: accountFilter },
           _sum: { amount: true },
         }),
         prisma.transaction.aggregate({
-          where: { date: { gte: startOfMonth, lte: endOfMonth }, type: 'EXPENSE' },
+          where: { date: { gte: startOfMonth, lte: endOfMonth }, type: 'EXPENSE', account: accountFilter },
           _sum: { amount: true },
         }),
       ])

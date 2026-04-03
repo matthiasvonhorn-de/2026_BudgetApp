@@ -42,3 +42,13 @@ next-env.d.ts
 node_modules/
 dist/
 prisma/dev.db
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Playwright test output
+test-results/
+playwright-report/
+
+# DB backups
+prisma/*.backup-*

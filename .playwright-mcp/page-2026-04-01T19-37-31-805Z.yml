@@ -1,0 +1,165 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]:
+        - img [ref=e6]
+        - generic [ref=e9]: BudgetApp
+      - navigation [ref=e10]:
+        - link [ref=e109] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e12]
+          - text: Dashboard
+        - link [ref=e110] [cursor=pointer]:
+          - /url: /accounts
+          - img [ref=e18]
+          - text: Konten
+        - link [ref=e111] [cursor=pointer]:
+          - /url: /loans
+          - img [ref=e21]
+          - text: Bankkredite
+        - link [ref=e112] [cursor=pointer]:
+          - /url: /transactions
+          - img [ref=e25]
+          - text: Transaktionen
+        - link [ref=e113] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e29]
+          - text: Berichte
+        - link [ref=e114] [cursor=pointer]:
+          - /url: /import
+          - img [ref=e32]
+          - text: Import
+        - link [ref=e115] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e36]
+          - text: Einstellungen
+      - button [ref=e116]:
+        - img [ref=e41]
+        - text: Dunkles Design
+    - main [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - link [ref=e117] [cursor=pointer]:
+            - /url: /settings
+            - button [ref=e118]:
+              - img
+              - text: Zurück
+          - heading [level=1] [ref=e119]: Bankkredite
+          - button [ref=e120]:
+            - img
+            - text: Neuer Kredit
+        - table [ref=e61]:
+          - rowgroup [ref=e62]:
+            - row [ref=e121]:
+              - columnheader [ref=e122]: Name
+              - columnheader [ref=e123]: Art
+              - columnheader [ref=e124]: Betrag
+              - columnheader [ref=e125]: Zinssatz
+              - columnheader [ref=e126]: Laufzeit
+              - columnheader [ref=e127]: Tilgung / Rate
+              - columnheader [ref=e70]
+          - rowgroup [ref=e71]:
+            - row [ref=e128]:
+              - cell [ref=e129]: An der Münze 10 - Kredit
+              - cell [ref=e130]: Annuitätendarlehen
+              - cell [ref=e131]: CHF 200’000.00
+              - cell [ref=e132]: 2.55 %
+              - cell [ref=e133]: 180 Mt.
+              - cell [ref=e134]:
+                - generic [ref=e79]: 0.000 % Tilg.
+                - text: CHF 425.00
+              - cell [ref=e80]:
+                - generic [ref=e81]:
+                  - button [ref=e135]:
+                    - img
+                  - button [ref=e136]:
+                    - img
+            - row [ref=e137]:
+              - cell [ref=e138]: Kredit Via Vignone
+              - cell [ref=e139]: Annuitätendarlehen
+              - cell [ref=e140]: CHF 190’000.00
+              - cell [ref=e141]: 1.69 %
+              - cell [ref=e142]: 180 Mt.
+              - cell [ref=e143]:
+                - generic [ref=e91]: 3.311 % Tilg.
+                - text: CHF 791.83
+              - cell [ref=e92]:
+                - generic [ref=e93]:
+                  - button [ref=e144]:
+                    - img
+                  - button [ref=e145]:
+                    - img
+            - row [ref=e146]:
+              - cell [ref=e147]: DB - Nachfinanzierung
+              - cell [ref=e148]: Annuitätendarlehen
+              - cell [ref=e149]: CHF 60’000.00
+              - cell [ref=e150]: 3.46 %
+              - cell [ref=e151]: 60 Mt.
+              - cell [ref=e152]:
+                - generic [ref=e103]: 5.200 % Tilg.
+                - text: CHF 433.00
+              - cell [ref=e104]:
+                - generic [ref=e105]:
+                  - button [ref=e153]:
+                    - img
+                  - button [ref=e154]:
+                    - img
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e56] [cursor=pointer]:
+    - img [ref=e57]
+  - alert [ref=e108]
+  - dialog "Kredit bearbeiten" [ref=e158]:
+    - heading "Kredit bearbeiten" [level=2] [ref=e160]
+    - generic [ref=e162]:
+      - generic [ref=e163]:
+        - generic [ref=e164]: Name *
+        - textbox "z.B. Autokredit" [active] [ref=e165]: An der Münze 10 - Kredit
+      - generic [ref=e166]:
+        - generic [ref=e167]: Kreditart *
+        - combobox [ref=e168]:
+          - generic [ref=e169]: Annuitätendarlehen (konstante Rate)
+          - img: ▼
+        - textbox [ref=e170]: ANNUITAETENDARLEHEN
+        - paragraph [ref=e171]: Gleiche Monatsrate über gesamte Laufzeit. Zinsanteil sinkt, Tilgungsanteil steigt.
+      - generic [ref=e172]:
+        - generic [ref=e173]: Darlehensbetrag (CHF) *
+        - spinbutton [ref=e174]: "200000"
+      - generic [ref=e175]:
+        - generic [ref=e176]: Zinssatz p.a. (%) *
+        - spinbutton [ref=e177]: "2.550"
+      - generic [ref=e178]:
+        - generic [ref=e179]: Laufzeit (Monate) *
+        - spinbutton [ref=e180]: "180"
+      - generic [ref=e181]:
+        - generic [ref=e182]: Erste Rate am *
+        - textbox [ref=e183]: 2015-02-01
+      - generic [ref=e184]:
+        - generic [ref=e185]: Bezahlt bis
+        - textbox [ref=e186]: 2026-03-01
+        - paragraph [ref=e187]: Alle Raten bis zu diesem Datum werden ohne Buchung als bezahlt markiert.
+      - generic [ref=e188]:
+        - generic [ref=e189]: Anfangstilgungssatz p.a. (%) *
+        - spinbutton [ref=e190]: "0.000"
+        - paragraph [ref=e191]: "→ Monatliche Rate: CHF 425.00 · Restschuld nach 180 Monaten verbleibt"
+      - generic [ref=e192]:
+        - generic [ref=e193]: Verknüpftes Konto
+        - combobox [ref=e194]:
+          - generic [ref=e195]: ING - Girokonto
+          - img: ▼
+        - textbox [ref=e196]: cmmpdk0l80000ho9k8ifb5l19
+      - generic [ref=e197]:
+        - generic [ref=e198]: Buchungskategorie für Kreditraten
+        - combobox [ref=e199]:
+          - generic [ref=e200]: Kreditrate Deutsche Bank
+          - img: ▼
+        - textbox [ref=e201]: cmn6jfg9b000bjs9k6touktgt
+        - paragraph [ref=e202]: Wird beim Markieren einer Rate als bezahlt automatisch gebucht
+      - generic [ref=e203]:
+        - generic [ref=e204]: Notizen
+        - textbox "Optional" [ref=e205]
+    - generic [ref=e206]:
+      - button "Abbrechen" [ref=e207]
+      - button "Speichern" [ref=e208]
+    - button "Close" [ref=e209]:
+      - img
+      - generic [ref=e210]: Close

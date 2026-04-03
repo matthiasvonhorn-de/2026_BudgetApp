@@ -59,7 +59,7 @@ function Select<Value = string, Multiple extends boolean | undefined = false>({
   // Pre-register items provided directly (for dynamic/ID-based selects)
   React.useEffect(() => {
     if (!items) return
-    items.forEach(({ value, label }) => labelsRef.current.set(value, label))
+    items.forEach(({ value, label }) => labelsRef.current.set(value, label as string))
     subscribersRef.current.forEach((cb) => cb())
   }, [items])
 

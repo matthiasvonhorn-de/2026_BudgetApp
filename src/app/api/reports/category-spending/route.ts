@@ -17,6 +17,7 @@ export async function GET(request: Request) {
         date: { gte: startOfMonth, lte: endOfMonth },
         type: 'EXPENSE',
         categoryId: { not: null },
+        account: { isActive: true, type: { notIn: ['SPARPLAN', 'FESTGELD'] } },
       },
       _sum: { amount: true },
     })

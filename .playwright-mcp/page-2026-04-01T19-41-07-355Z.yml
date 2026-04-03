@@ -1,0 +1,114 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]:
+        - img [ref=e6]
+        - generic [ref=e9]: BudgetApp
+      - navigation [ref=e10]:
+        - link "Dashboard" [ref=e212] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e12]
+          - text: Dashboard
+        - link "Konten" [ref=e213] [cursor=pointer]:
+          - /url: /accounts
+          - img [ref=e18]
+          - text: Konten
+        - link "Bankkredite" [ref=e214] [cursor=pointer]:
+          - /url: /loans
+          - img [ref=e21]
+          - text: Bankkredite
+        - link "Transaktionen" [ref=e215] [cursor=pointer]:
+          - /url: /transactions
+          - img [ref=e25]
+          - text: Transaktionen
+        - link "Berichte" [ref=e216] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e29]
+          - text: Berichte
+        - link "Import" [ref=e217] [cursor=pointer]:
+          - /url: /import
+          - img [ref=e32]
+          - text: Import
+        - link "Einstellungen" [ref=e218] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e36]
+          - text: Einstellungen
+      - button "Dunkles Design" [ref=e219]:
+        - img [ref=e41]
+        - text: Dunkles Design
+    - main [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - link "Zurück" [ref=e220] [cursor=pointer]:
+            - /url: /settings
+            - button "Zurück" [ref=e221]:
+              - img
+              - text: Zurück
+          - heading "Bankkredite" [level=1] [ref=e222]
+          - button "Neuer Kredit" [ref=e223]:
+            - img
+            - text: Neuer Kredit
+        - table [ref=e61]:
+          - rowgroup [ref=e62]:
+            - row "Name Art Betrag Zinssatz Laufzeit Tilgung / Rate" [ref=e224]:
+              - columnheader "Name" [ref=e225]
+              - columnheader "Art" [ref=e226]
+              - columnheader "Betrag" [ref=e227]
+              - columnheader "Zinssatz" [ref=e228]
+              - columnheader "Laufzeit" [ref=e229]
+              - columnheader "Tilgung / Rate" [ref=e230]
+              - columnheader [ref=e70]
+          - rowgroup [ref=e71]:
+            - row "An der Münze 10 - Kredit Annuitätendarlehen CHF 200’000.00 2.55 % 180 Mt. 0.000 % Tilg. CHF 425.00" [ref=e231]:
+              - cell "An der Münze 10 - Kredit" [ref=e232]
+              - cell "Annuitätendarlehen" [ref=e233]
+              - cell "CHF 200’000.00" [ref=e234]
+              - cell "2.55 %" [ref=e235]
+              - cell "180 Mt." [ref=e236]
+              - cell "0.000 % Tilg. CHF 425.00" [ref=e237]:
+                - generic [ref=e79]: 0.000 % Tilg.
+                - text: CHF 425.00
+              - cell [ref=e80]:
+                - generic [ref=e81]:
+                  - button "Bearbeiten" [ref=e238]:
+                    - img
+                  - button "Löschen" [ref=e239]:
+                    - img
+            - row "Kredit Via Vignone Annuitätendarlehen CHF 190’000.00 1.69 % 180 Mt. 3.311 % Tilg. CHF 791.83" [ref=e240]:
+              - cell "Kredit Via Vignone" [ref=e241]
+              - cell "Annuitätendarlehen" [ref=e242]
+              - cell "CHF 190’000.00" [ref=e243]
+              - cell "1.69 %" [ref=e244]
+              - cell "180 Mt." [ref=e245]
+              - cell "3.311 % Tilg. CHF 791.83" [ref=e246]:
+                - generic [ref=e91]: 3.311 % Tilg.
+                - text: CHF 791.83
+              - cell [ref=e92]:
+                - generic [ref=e93]:
+                  - button "Bearbeiten" [ref=e247]:
+                    - img
+                  - button "Löschen" [ref=e248]:
+                    - img
+            - row "DB - Nachfinanzierung Annuitätendarlehen CHF 60’000.00 3.46 % 60 Mt. 5.200 % Tilg. CHF 433.00" [ref=e249]:
+              - cell "DB - Nachfinanzierung" [ref=e250]
+              - cell "Annuitätendarlehen" [ref=e251]
+              - cell "CHF 60’000.00" [ref=e252]
+              - cell "3.46 %" [ref=e253]
+              - cell "60 Mt." [ref=e254]
+              - cell "5.200 % Tilg. CHF 433.00" [ref=e255]:
+                - generic [ref=e103]: 5.200 % Tilg.
+                - text: CHF 433.00
+              - cell [ref=e104]:
+                - generic [ref=e105]:
+                  - button "Bearbeiten" [active] [ref=e256]:
+                    - img
+                  - button "Löschen" [ref=e257]:
+                    - img
+  - region "Notifications alt+T":
+    - list:
+      - listitem [ref=e258]:
+        - img [ref=e260]
+        - generic [ref=e264]: Kredit gespeichert
+  - button "Open Next.js Dev Tools" [ref=e56] [cursor=pointer]:
+    - img [ref=e57]
+  - alert [ref=e108]
