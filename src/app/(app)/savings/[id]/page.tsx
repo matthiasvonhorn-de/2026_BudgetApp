@@ -8,7 +8,8 @@ import { ArrowLeft, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
-import type { SavingsEntry } from '@/types/api'
+import { AccountFormDialog } from '@/components/accounts/AccountFormDialog'
+import type { Account, SavingsEntry } from '@/types/api'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 
@@ -30,6 +31,7 @@ export default function SavingsDetailPage() {
   const fmt = useFormatCurrency()
 
   const [viewYears, setViewYears] = useState<number | null>(5)
+  const [editOpen, setEditOpen] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['savings', id],
@@ -126,11 +128,9 @@ export default function SavingsDetailPage() {
             {cfg.accountNumber && ` · ${cfg.accountNumber}`}
           </p>
         </div>
-        <Link href={`/savings/${id}/edit`}>
-          <Button variant="outline" size="sm">
-            <Pencil className="h-4 w-4 mr-1" /> Bearbeiten
-          </Button>
-        </Link>
+        <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+          <Pencil className="h-4 w-4 mr-1" /> Bearbeiten
+        </Button>
       </div>
 
       {/* Stats */}
@@ -265,6 +265,12 @@ export default function SavingsDetailPage() {
           </tbody>
         </table>
       </div>
+
+      <AccountFormDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        account={account as Account}
+      />
     </div>
   )
 }
