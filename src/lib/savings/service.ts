@@ -116,7 +116,7 @@ export async function createSavings(data: CreateInput) {
         name: data.name,
         type: data.savingsType,
         color: data.color ?? '#10b981',
-        currentBalance: roundCents(initialBalance - upfrontFee),
+        currentBalance: initialBalance,
         isActive: true,
       },
     })
@@ -213,7 +213,11 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
     data.upfrontFee !== undefined &&
     Math.abs(data.upfrontFee - config.upfrontFee) > 1e-9
 
-  const needsRebuild = interestRateChanged || feeChanged
+  const contributionChanged =
+    data.contributionAmount !== undefined &&
+    Math.abs(data.contributionAmount - config.contributionAmount) > 1e-9
+
+  const needsRebuild = interestRateChanged || feeChanged || contributionChanged
 
   await prisma.$transaction(async (tx) => {
     if (data.name !== undefined || data.color !== undefined) {
@@ -235,81 +239,146 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.interestRate !== undefined && { interestRate: data.interestRate }),
         ...(data.upfrontFee !== undefined && { upfrontFee: data.upfrontFee }),
+        ...(data.contributionAmount !== undefined && { contributionAmount: data.contributionAmount }),
       },
     })
 
     if (!needsRebuild) return
 
-    const newRate = data.interestRate!
+    const newRate = data.interestRate ?? config.interestRate
+    const newFee = data.upfrontFee ?? config.upfrontFee
+    const newContribution = data.contributionAmount ?? config.contributionAmount
 
-    const lastPaidInterest = config.entries
-      .filter(e => e.entryType === 'INTEREST' && e.paidAt !== null)
+    // Find the last interest entry that was actually booked (has a real transaction).
+    // Initialized entries (paidAt set but no transactionId) can be safely rebuilt.
+    const lastBookedInterest = config.entries
+      .filter(e => e.entryType === 'INTEREST' && e.paidAt !== null && e.transactionId !== null)
       .sort((a, b) => b.periodNumber - a.periodNumber)[0]
 
+    // Delete all interest entries that can be rebuilt:
+    // - unpaid entries (paidAt === null)
+    // - initialized entries (paidAt set but no transactionId)
+    // Delete all rebuildable entries (no real transaction attached)
     await tx.savingsEntry.deleteMany({
-      where: { savingsConfigId: config.id, entryType: 'INTEREST', paidAt: null },
+      where: {
+        savingsConfigId: config.id,
+        OR: [
+          { paidAt: null },
+          { paidAt: { not: null }, transactionId: null },
+        ],
+      },
     })
 
-    const allPaidSorted = config.entries
-      .filter(e => e.paidAt !== null)
-      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime() || (a.entryType === 'INTEREST' ? -1 : 1))
-    const balanceAfterPaid = allPaidSorted.length > 0
-      ? allPaidSorted[allPaidSorted.length - 1].scheduledBalance
+    // Determine rebuild starting point
+    const bookedEntries = config.entries
+      .filter(e => e.paidAt !== null && e.transactionId !== null)
+      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+    const balanceAfterBooked = bookedEntries.length > 0
+      ? bookedEntries[bookedEntries.length - 1].scheduledBalance
       : config.initialBalance
 
-    const firstUnpaidContrib = config.entries
-      .filter(e => e.entryType === 'CONTRIBUTION' && e.paidAt === null)
-      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]
-    const rebuildFrom = firstUnpaidContrib?.dueDate ?? lastPaidInterest?.dueDate ?? config.startDate
+    // For the full rebuild: use the initial balance minus fee as the starting point
+    // if no entries were actually booked with transactions
+    const effectiveStartBalance = bookedEntries.length > 0
+      ? balanceAfterBooked
+      : config.initialBalance
 
-    const unpaidContribs = config.entries.filter(e => e.entryType === 'CONTRIBUTION' && e.paidAt === null)
-    const lastEntry = config.entries[config.entries.length - 1]
-    const remainingMonths = config.termMonths !== null
-      ? Math.max(Math.round((lastEntry?.dueDate.getTime() ?? rebuildFrom.getTime()) - rebuildFrom.getTime()) / (30.44 * 24 * 60 * 60 * 1000), 0)
-      : unpaidContribs.length > 0
-        ? Math.round((unpaidContribs[unpaidContribs.length - 1].dueDate.getTime() - rebuildFrom.getTime()) / (30.44 * 24 * 60 * 60 * 1000)) + 1
-        : 0
+    const rebuildFrom = bookedEntries.length > 0
+      ? bookedEntries[bookedEntries.length - 1].dueDate
+      : config.startDate
+
+    // Determine how many months to regenerate
+    const allContribs = config.entries.filter(e => e.entryType === 'CONTRIBUTION')
+    const lastContrib = allContribs[allContribs.length - 1]
+    const lastEntryDate = lastContrib?.dueDate ?? config.entries[config.entries.length - 1]?.dueDate
+
+    const remainingMonths = lastEntryDate
+      ? Math.max(Math.round((lastEntryDate.getTime() - rebuildFrom.getTime()) / (30.44 * 24 * 60 * 60 * 1000)), 1) + 1
+      : 24
 
     if (remainingMonths > 0) {
       const newSchedule = generateSavingsSchedule({
         savingsType: (config.account?.type ?? 'SPARPLAN') as 'SPARPLAN' | 'FESTGELD',
-        initialBalance: balanceAfterPaid,
-        contributionAmount: config.contributionAmount,
+        initialBalance: effectiveStartBalance,
+        upfrontFee: bookedEntries.length > 0 ? 0 : newFee,
+        contributionAmount: newContribution,
         contributionFrequency: config.contributionFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY' | null,
         interestRate: newRate,
         interestFrequency: config.interestFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY',
         startDate: rebuildFrom,
-        termMonths: remainingMonths + 1,
+        termMonths: remainingMonths,
       })
 
-      const interestOnly = newSchedule.filter(r => r.entryType === 'INTEREST')
-      let interestCounter = (lastPaidInterest?.periodNumber ?? 0)
+      // Get all non-contribution entries (FEE + INTEREST)
+      // Count existing booked entries per type to continue numbering
+      const bookedInterestCount = bookedEntries.filter(e => e.entryType === 'INTEREST').length
+      const bookedContribCount = bookedEntries.filter(e => e.entryType === 'CONTRIBUTION').length
+      const counters: Record<string, number> = {
+        INTEREST: bookedInterestCount,
+        CONTRIBUTION: bookedContribCount,
+        FEE: 0,
+      }
 
-      await tx.savingsEntry.createMany({
-        data: interestOnly.map(row => ({
+      const toCreate = newSchedule.map(row => ({
+        savingsConfigId: config.id,
+        entryType: row.entryType,
+        periodNumber: ++counters[row.entryType],
+        dueDate: row.dueDate,
+        scheduledAmount: row.scheduledAmount,
+        scheduledBalance: row.scheduledBalance,
+      }))
+
+      if (toCreate.length > 0) {
+        await tx.savingsEntry.createMany({ data: toCreate })
+      }
+
+      // Re-initialize past entries that were rebuilt (mark as paid without transaction)
+      const today = new Date()
+      today.setHours(23, 59, 59, 999)
+      await tx.savingsEntry.updateMany({
+        where: {
           savingsConfigId: config.id,
-          entryType: 'INTEREST' as const,
-          periodNumber: ++interestCounter,
-          dueDate: row.dueDate,
-          scheduledAmount: row.scheduledAmount,
-          scheduledBalance: row.scheduledBalance,
-        })),
+          paidAt: null,
+          transactionId: null,
+          dueDate: { lte: today },
+          entryType: { in: ['INTEREST', 'FEE', 'CONTRIBUTION'] },
+        },
+        data: { paidAt: new Date() },
       })
 
-      const allUnpaid = [
-        ...interestOnly.map(r => ({ ...r, id: null as string | null })),
-        ...unpaidContribs.map(r => ({ entryType: 'CONTRIBUTION' as const, dueDate: r.dueDate, scheduledAmount: r.scheduledAmount, id: r.id })),
-      ].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime() || (a.entryType === 'INTEREST' ? -1 : 1))
+      // Recalculate running balances for all contribution entries
+      const rebuiltEntries = await tx.savingsEntry.findMany({
+        where: { savingsConfigId: config.id },
+        orderBy: [{ dueDate: 'asc' }, { entryType: 'asc' }],
+      })
 
-      let runningBalance = balanceAfterPaid
-      for (const entry of allUnpaid) {
+      // Start from initialBalance — the FEE entry in the schedule handles the deduction
+      let runningBalance = config.initialBalance
+      for (const entry of rebuiltEntries) {
         runningBalance = roundCents(runningBalance + entry.scheduledAmount)
-        if (entry.entryType === 'CONTRIBUTION' && entry.id) {
+        if (Math.abs(entry.scheduledBalance - runningBalance) > 0.001) {
           await tx.savingsEntry.update({
             where: { id: entry.id },
             data: { scheduledBalance: runningBalance },
           })
         }
+      }
+
+      // Update account balance to match the last paid entry
+      const lastPaid = rebuiltEntries
+        .filter(e => e.paidAt !== null)
+        .sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime())[0]
+      if (lastPaid) {
+        // Recalculate the correct balance for the last paid entry
+        let bal = config.initialBalance
+        for (const e of rebuiltEntries) {
+          bal = roundCents(bal + e.scheduledAmount)
+          if (e.id === lastPaid.id) break
+        }
+        await tx.account.update({
+          where: { id: accountId },
+          data: { currentBalance: bal },
+        })
       }
     }
 

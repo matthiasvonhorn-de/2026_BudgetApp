@@ -6,10 +6,36 @@ import { createAccountSchema } from '@/lib/schemas/accounts'
 export const GET = withHandler(async () => {
   const accounts = await prisma.account.findMany({
     where: { isActive: true },
-    include: { _count: { select: { transactions: true } } },
+    include: {
+      _count: { select: { transactions: true } },
+      savingsConfig: {
+        select: {
+          _count: {
+            select: {
+              entries: { where: { entryType: 'CONTRIBUTION', paidAt: { not: null } } },
+            },
+          },
+          entries: { where: { entryType: 'CONTRIBUTION' }, select: { id: true } },
+        },
+      },
+    },
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
   })
-  return NextResponse.json(accounts.map(a => ({ ...a })))
+
+  return NextResponse.json(accounts.map(a => {
+    const sc = a.savingsConfig
+    if (sc) {
+      return {
+        ...a,
+        savingsConfig: undefined,
+        _savingsProgress: {
+          paid: sc._count.entries,
+          total: sc.entries.length,
+        },
+      }
+    }
+    return { ...a, savingsConfig: undefined }
+  }))
 })
 
 export const POST = withHandler(async (request: Request) => {
