@@ -6,6 +6,13 @@ import { ArrowLeft, Plus } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
+  Pagination, PaginationContent, PaginationItem, PaginationLink,
+  PaginationPrevious, PaginationNext, PaginationEllipsis,
+} from '@/components/ui/pagination'
 import { ACCOUNT_TYPE_LABELS, formatDate } from '@/lib/utils'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useState } from 'react'
@@ -17,17 +24,47 @@ import { TransactionFormDialog } from '@/components/transactions/TransactionForm
 const TABS = ['Transaktionen', 'Unterkonten', 'Budget'] as const
 type Tab = typeof TABS[number]
 
+const PAGE_SIZES = [100, 250, 500, 1000, 0] as const
+
+function getPageNumbers(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages: (number | 'ellipsis')[] = [1]
+  if (current > 3) pages.push('ellipsis')
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+    pages.push(i)
+  }
+  if (current < total - 2) pages.push('ellipsis')
+  pages.push(total)
+  return pages
+}
+
 export default function AccountDetailPage() {
   const { id } = useParams()
   const [reconcileOpen, setReconcileOpen] = useState(false)
   const [newTxOpen, setNewTxOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('Transaktionen')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(100)
 
   const fmt = useFormatCurrency()
   const { data: account, isLoading } = useQuery({
     queryKey: ['accounts', id],
     queryFn: () => fetch(`/api/accounts/${id}`).then(r => r.json()),
   })
+
+  const { data: txResult, isPlaceholderData } = useQuery({
+    queryKey: ['account-transactions', id, page, pageSize],
+    queryFn: () => {
+      const params = new URLSearchParams({ accountId: id as string, page: String(page), pageSize: String(pageSize) })
+      return fetch(`/api/transactions?${params}`).then(r => r.json())
+    },
+    placeholderData: (prev) => prev,
+    enabled: tab === 'Transaktionen',
+  })
+
+  const transactions = txResult?.data ?? []
+  const txTotal = txResult?.total ?? 0
+  const totalPages = pageSize > 0 ? Math.ceil(txTotal / pageSize) : 1
 
   if (isLoading) return <div className="p-6">Laden...</div>
   if (!account) return <div className="p-6">Konto nicht gefunden</div>
@@ -91,13 +128,34 @@ export default function AccountDetailPage() {
       {tab === 'Transaktionen' && (
         <>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Letzte Transaktionen</h2>
-            <Button size="sm" onClick={() => setNewTxOpen(true)}>
-              <Plus className="h-4 w-4 mr-1.5" />
-              Neue Transaktion
-            </Button>
+            <h2 className="text-lg font-semibold">Transaktionen</h2>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Pro Seite:</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={v => { setPageSize(Number(v)); setPage(1) }}
+                >
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZES.map(size => (
+                      <SelectItem key={size} value={String(size)}>
+                        {size === 0 ? 'Alle' : size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <span className="text-sm text-muted-foreground">{txTotal} gesamt</span>
+              </div>
+              <Button size="sm" onClick={() => setNewTxOpen(true)}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                Neue Transaktion
+              </Button>
+            </div>
           </div>
-          <div className="rounded-lg border overflow-hidden">
+          <div className={`rounded-lg border overflow-hidden ${isPlaceholderData ? 'opacity-60' : ''}`}>
             <table className="w-full text-sm">
               <thead className="bg-muted">
                 <tr>
@@ -108,9 +166,9 @@ export default function AccountDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {account.transactions?.length === 0 ? (
+                {transactions.length === 0 ? (
                   <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">Keine Transaktionen</td></tr>
-                ) : account.transactions?.map((t: any) => (
+                ) : transactions.map((t: any) => (
                   <tr key={t.id} className="border-t hover:bg-muted/50">
                     <td className="p-3 text-muted-foreground">{formatDate(t.date)}</td>
                     <td className="p-3">
@@ -134,6 +192,47 @@ export default function AccountDetailPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {pageSize > 0 && totalPages > 1 && (
+            <div className="mt-4">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      text="Zurück"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      className={page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {getPageNumbers(page, totalPages).map((p, i) =>
+                    p === 'ellipsis' ? (
+                      <PaginationItem key={`e${i}`}>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    ) : (
+                      <PaginationItem key={p}>
+                        <PaginationLink
+                          isActive={p === page}
+                          onClick={() => setPage(p)}
+                          className="cursor-pointer"
+                        >
+                          {p}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                  )}
+                  <PaginationItem>
+                    <PaginationNext
+                      text="Weiter"
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      className={page >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </>
       )}
 
