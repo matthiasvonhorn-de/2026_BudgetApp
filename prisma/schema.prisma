@@ -341,6 +341,12 @@ model SavingsEntry {
   @@index([savingsConfigId])
 }
 
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model CsvProfile {
   id            String   @id @default(cuid())
   name          String
