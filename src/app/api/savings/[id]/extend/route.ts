@@ -9,6 +9,10 @@ const ExtendSchema = z.object({
   months: z.number().int().min(1).max(360).default(24),
 })
 
+/**
+ * Idempotent: ensures entries cover at least `today + months` ahead.
+ * If entries already reach the horizon, returns { added: 0 }.
+ */
 export const POST = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
   const body = await request.json().catch(() => ({}))
@@ -27,6 +31,13 @@ export const POST = withHandler(async (request: Request, ctx) => {
   }
 
   const lastEntry = config.entries[config.entries.length - 1]
+  const horizon = addMonths(new Date(), months)
+
+  // Idempotent: already covered
+  if (lastEntry && lastEntry.dueDate >= horizon) {
+    return NextResponse.json({ added: 0 })
+  }
+
   const interestPeriodMonths =
     config.interestFrequency === 'MONTHLY' ? 1
     : config.interestFrequency === 'QUARTERLY' ? 3
@@ -35,6 +46,12 @@ export const POST = withHandler(async (request: Request, ctx) => {
   const extendFrom = lastEntry
     ? addMonths(lastEntry.dueDate, interestPeriodMonths)
     : config.startDate
+
+  const monthsNeeded = Math.ceil(
+    (horizon.getTime() - extendFrom.getTime()) / (30.44 * 24 * 60 * 60 * 1000)
+  ) + interestPeriodMonths
+
+  if (monthsNeeded <= 0) return NextResponse.json({ added: 0 })
 
   const maxInterestPeriod = config.entries
     .filter(e => e.entryType === 'INTEREST')
@@ -51,7 +68,7 @@ export const POST = withHandler(async (request: Request, ctx) => {
     interestRate: config.interestRate,
     interestFrequency: config.interestFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY',
     startDate: extendFrom,
-    termMonths: months,
+    termMonths: monthsNeeded,
   })
 
   if (extension.length === 0) return NextResponse.json({ added: 0 })
