@@ -117,13 +117,13 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
             <FormField control={form.control} name="bank" render={({ field }) => (
               <FormItem>
                 <FormLabel>Bank</FormLabel>
-                <FormControl><Input placeholder="z.B. Zürcher Kantonalbank" {...field} /></FormControl>
+                <FormControl><Input placeholder="z.B. Deutsche Bank" {...field} /></FormControl>
               </FormItem>
             )} />
             <FormField control={form.control} name="iban" render={({ field }) => (
               <FormItem>
                 <FormLabel>IBAN</FormLabel>
-                <FormControl><Input placeholder="CH56 0483 5012 3456 7800 9" {...field} /></FormControl>
+                <FormControl><Input placeholder="DE89 3704 0044 0532 0130 00" {...field} /></FormControl>
               </FormItem>
             )} />
             <FormField control={form.control} name="type" render={({ field }) => (

@@ -184,7 +184,7 @@ export interface Loan {
 export interface SavingsEntry {
   id: string
   savingsConfigId: string
-  entryType: 'CONTRIBUTION' | 'INTEREST'
+  entryType: 'CONTRIBUTION' | 'INTEREST' | 'FEE'
   periodNumber: number
   dueDate: string
   scheduledAmount: number
@@ -200,6 +200,7 @@ export interface SavingsConfig {
   account: { id: string; name: string; color: string; type: AccountType; currentBalance: number }
   linkedAccount?: { id: string; name: string } | null
   initialBalance: number
+  upfrontFee: number
   accountNumber: string | null
   contributionAmount: number
   contributionFrequency: string | null

@@ -283,6 +283,7 @@ enum SavingsFrequency {
 enum SavingsEntryType {
   CONTRIBUTION
   INTEREST
+  FEE
 }
 
 // Spar-spezifische Konfiguration — 1:1 mit einem Account vom Typ SPARPLAN oder FESTGELD
@@ -292,6 +293,7 @@ model SavingsConfig {
   account               Account           @relation("SavingsAccount", fields: [accountId], references: [id])
 
   initialBalance        Float             @default(0)
+  upfrontFee            Float             @default(0)
   accountNumber         String?           // IBAN / Kontonummer des Sparkontos (informativ)
 
   // Nur SPARPLAN:

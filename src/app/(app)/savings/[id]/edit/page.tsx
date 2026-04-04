@@ -19,6 +19,7 @@ interface EditForm {
   color: string
   accountNumber: string
   interestRate: string
+  upfrontFee: string
   linkedAccountId: string
   categoryId: string
   notes: string
@@ -45,6 +46,7 @@ export default function SavingsEditPage() {
       color: data.account.color ?? '#10b981',
       accountNumber: data.accountNumber ?? '',
       interestRate: (data.interestRate * 100).toFixed(2),
+      upfrontFee: (data.upfrontFee ?? 0).toString(),
       linkedAccountId: data.linkedAccountId ?? '',
       categoryId: data.categoryId ?? '',
       notes: data.notes ?? '',
@@ -78,6 +80,7 @@ export default function SavingsEditPage() {
         color: form.color,
         accountNumber: form.accountNumber || null,
         interestRate: parseFloat(form.interestRate.replace(',', '.')) / 100,
+        upfrontFee: parseFloat(form.upfrontFee || '0'),
         linkedAccountId: form.linkedAccountId || null,
         categoryId: form.categoryId || null,
         notes: form.notes || null,
@@ -110,6 +113,8 @@ export default function SavingsEditPage() {
   )
   const originalRate = (data.interestRate * 100).toFixed(2)
   const rateChanged = form.interestRate !== originalRate
+  const originalFee = (data.upfrontFee ?? 0).toString()
+  const feeChanged = form.upfrontFee !== originalFee
 
   return (
     <div className="p-6 max-w-lg">
@@ -158,6 +163,22 @@ export default function SavingsEditPage() {
           {rateChanged && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
               Ändert den Zinssatz — alle noch offenen Zinsgutschriften werden neu berechnet.
+            </p>
+          )}
+        </div>
+
+        {/* Abschlussgebühr */}
+        <div className="space-y-1.5">
+          <Label>Abschlussgebühr (€)</Label>
+          <Input
+            type="number" min="0" step="10"
+            value={form.upfrontFee}
+            onChange={e => set('upfrontFee', e.target.value)}
+            placeholder="0"
+          />
+          {feeChanged && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Ändert die Gebühr — alle noch offenen Einträge werden neu berechnet.
             </p>
           )}
         </div>

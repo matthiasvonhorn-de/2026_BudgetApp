@@ -1,9 +1,10 @@
 export type SavingsFrequency = 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY'
-export type SavingsEntryType = 'CONTRIBUTION' | 'INTEREST'
+export type SavingsEntryType = 'CONTRIBUTION' | 'INTEREST' | 'FEE'
 
 export interface SavingsScheduleParams {
   savingsType: 'SPARPLAN' | 'FESTGELD'
   initialBalance: number
+  upfrontFee?: number
   contributionAmount: number
   contributionFrequency: SavingsFrequency | null
   interestRate: number          // p.a. als Dezimal
@@ -40,6 +41,7 @@ export function generateSavingsSchedule(params: SavingsScheduleParams): SavingsS
   const {
     savingsType,
     initialBalance,
+    upfrontFee = 0,
     contributionAmount,
     contributionFrequency,
     interestRate,
@@ -48,12 +50,27 @@ export function generateSavingsSchedule(params: SavingsScheduleParams): SavingsS
     termMonths,
   } = params
 
+  const rows: SavingsScheduleRow[] = []
+  let balance = initialBalance
+
+  // FEE row: deduct upfront fee as the first entry
+  if (upfrontFee > 0) {
+    balance = roundCents(balance - upfrontFee)
+    rows.push({
+      entryType: 'FEE',
+      periodNumber: 1,
+      dueDate: startDate,
+      scheduledAmount: -upfrontFee,
+      scheduledBalance: balance,
+    })
+  }
+
   const interestPeriodMonths = 12 / periodsPerYear(interestFrequency)
   const contribPeriodMonths = contributionFrequency
     ? 12 / periodsPerYear(contributionFrequency)
     : null
 
-  type ScheduledEvent = { date: Date; type: SavingsEntryType }
+  type ScheduledEvent = { date: Date; type: 'CONTRIBUTION' | 'INTEREST' }
   const events: ScheduledEvent[] = []
 
   for (let m = 0; m < termMonths; m += interestPeriodMonths) {
@@ -72,10 +89,8 @@ export function generateSavingsSchedule(params: SavingsScheduleParams): SavingsS
     return a.type === 'INTEREST' ? -1 : 1
   })
 
-  const rows: SavingsScheduleRow[] = []
-  let balance = initialBalance
   const interestPeriodRate = interestRate / periodsPerYear(interestFrequency)
-  const counters: Record<SavingsEntryType, number> = { INTEREST: 0, CONTRIBUTION: 0 }
+  const counters: Record<'INTEREST' | 'CONTRIBUTION', number> = { INTEREST: 0, CONTRIBUTION: 0 }
   const seen = new Set<string>()
 
   for (const event of events) {
@@ -84,9 +99,17 @@ export function generateSavingsSchedule(params: SavingsScheduleParams): SavingsS
     seen.add(key)
 
     counters[event.type]++
-    const amount = event.type === 'INTEREST'
-      ? roundCents(balance * interestPeriodRate)
-      : contributionAmount
+
+    let amount: number
+    if (event.type === 'INTEREST') {
+      // Only calculate interest when balance is positive
+      amount = balance > 0 ? roundCents(balance * interestPeriodRate) : 0
+    } else {
+      amount = contributionAmount
+    }
+
+    // Skip zero-interest rows (while balance is negative)
+    if (event.type === 'INTEREST' && amount === 0) continue
 
     balance = roundCents(balance + amount)
 

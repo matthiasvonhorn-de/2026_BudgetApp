@@ -102,6 +102,7 @@ export async function getSavingsDetail(accountId: string) {
 export async function createSavings(data: CreateInput) {
   const startDate = new Date(data.startDate)
   const initialBalance = data.initialBalance ?? 0
+  const upfrontFee = data.upfrontFee ?? 0
   const contributionAmount = data.savingsType === 'SPARPLAN' ? (data.contributionAmount ?? 0) : 0
   const contributionFrequency = data.savingsType === 'SPARPLAN'
     ? (data.contributionFrequency ?? null)
@@ -115,7 +116,7 @@ export async function createSavings(data: CreateInput) {
         name: data.name,
         type: data.savingsType,
         color: data.color ?? '#10b981',
-        currentBalance: initialBalance,
+        currentBalance: roundCents(initialBalance - upfrontFee),
         isActive: true,
       },
     })
@@ -124,6 +125,7 @@ export async function createSavings(data: CreateInput) {
       data: {
         accountId: account.id,
         initialBalance,
+        upfrontFee,
         accountNumber: data.accountNumber ?? null,
         contributionAmount,
         contributionFrequency: contributionFrequency ?? null,
@@ -140,6 +142,7 @@ export async function createSavings(data: CreateInput) {
     const schedule = generateSavingsSchedule({
       savingsType: data.savingsType,
       initialBalance,
+      upfrontFee,
       contributionAmount,
       contributionFrequency: contributionFrequency ?? null,
       interestRate: data.interestRate,
@@ -206,6 +209,12 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
     data.interestRate !== undefined &&
     Math.abs(data.interestRate - config.interestRate) > 1e-9
 
+  const feeChanged =
+    data.upfrontFee !== undefined &&
+    Math.abs(data.upfrontFee - config.upfrontFee) > 1e-9
+
+  const needsRebuild = interestRateChanged || feeChanged
+
   await prisma.$transaction(async (tx) => {
     if (data.name !== undefined || data.color !== undefined) {
       await tx.account.update({
@@ -225,10 +234,11 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
         ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.interestRate !== undefined && { interestRate: data.interestRate }),
+        ...(data.upfrontFee !== undefined && { upfrontFee: data.upfrontFee }),
       },
     })
 
-    if (!interestRateChanged) return
+    if (!needsRebuild) return
 
     const newRate = data.interestRate!
 
