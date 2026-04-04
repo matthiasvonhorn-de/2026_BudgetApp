@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { withHandler } from '@/lib/api/handler'
 
 const accountSchema = z.object({
   name: z.string().min(1),
@@ -12,38 +13,20 @@ const accountSchema = z.object({
   currentBalance: z.number().default(0),
 })
 
-export async function GET() {
-  try {
-    const accounts = await prisma.account.findMany({
-      where: { isActive: true },
-      include: {
-        _count: { select: { transactions: true } },
-      },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    })
+export const GET = withHandler(async () => {
+  const accounts = await prisma.account.findMany({
+    where: { isActive: true },
+    include: { _count: { select: { transactions: true } } },
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+  })
+  return NextResponse.json(accounts.map(a => ({ ...a })))
+})
 
-    const result = accounts.map(a => ({ ...a }))
-
-    return NextResponse.json(result)
-  } catch {
-    return NextResponse.json({ error: 'Fehler beim Laden der Konten' }, { status: 500 })
-  }
-}
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json()
-    const data = accountSchema.parse(body)
-
-    const maxOrder = await prisma.account.aggregate({ _max: { sortOrder: true } })
-    const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1
-
-    const account = await prisma.account.create({ data: { ...data, sortOrder } })
-    return NextResponse.json(account, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Fehler beim Erstellen des Kontos' }, { status: 500 })
-  }
-}
+export const POST = withHandler(async (request: Request) => {
+  const body = await request.json()
+  const data = accountSchema.parse(body)
+  const maxOrder = await prisma.account.aggregate({ _max: { sortOrder: true } })
+  const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1
+  const account = await prisma.account.create({ data: { ...data, sortOrder } })
+  return NextResponse.json(account, { status: 201 })
+})
