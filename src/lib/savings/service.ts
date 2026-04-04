@@ -301,6 +301,33 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
         }
       }
     }
+
+    // Initialize past entries (paidAt set, no transactions) — same as creation
+    if (data.initializedUntil) {
+      const initCutoff = new Date(data.initializedUntil)
+      initCutoff.setHours(23, 59, 59, 999)
+
+      // Only mark entries that are unpaid AND have no transaction
+      const initialized = await tx.savingsEntry.updateMany({
+        where: { savingsConfigId: config.id, paidAt: null, dueDate: { lte: initCutoff } },
+        data: { paidAt: new Date() },
+      })
+
+      if (initialized.count > 0) {
+        // Update account balance to the last initialized entry's scheduled balance
+        const allEntries = await tx.savingsEntry.findMany({
+          where: { savingsConfigId: config.id, paidAt: { not: null } },
+          orderBy: [{ dueDate: 'desc' }, { entryType: 'desc' }],
+          take: 1,
+        })
+        if (allEntries.length > 0) {
+          await tx.account.update({
+            where: { id: accountId },
+            data: { currentBalance: allEntries[0].scheduledBalance },
+          })
+        }
+      }
+    }
   })
 }
 

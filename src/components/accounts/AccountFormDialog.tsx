@@ -61,6 +61,8 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
     if (open) {
       form.reset(account ? {
         ...account,
+        bank: account.bank ?? '',
+        iban: account.iban ?? '',
         currentBalance: Math.round((account.currentBalance ?? 0) * 100) / 100,
       } : {
         name: '',
