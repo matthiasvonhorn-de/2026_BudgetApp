@@ -31,7 +31,7 @@ export function ReconcileDialog({ accountId, accountName, open, onOpenChange }: 
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['transactions-reconcile', accountId],
-    queryFn: () => fetch(`/api/transactions?accountId=${accountId}&limit=500`).then(r => r.json()),
+    queryFn: () => fetch(`/api/transactions?accountId=${accountId}`).then(r => r.json().then(r => r.data)),
     enabled: open,
   })
 
