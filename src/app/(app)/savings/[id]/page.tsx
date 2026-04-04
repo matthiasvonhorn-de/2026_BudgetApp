@@ -92,15 +92,19 @@ export default function SavingsDetailPage() {
   const account = cfg.account
   const entries: SavingsEntry[] = cfg.entries ?? []
 
-  const cutoffDate = viewYears === null ? null : (() => {
-    const d = new Date()
-    d.setFullYear(d.getFullYear() + viewYears)
-    return d
-  })()
-
-  const visibleEntries = cutoffDate === null
+  const visibleEntries = viewYears === null
     ? entries
-    : entries.filter((e: SavingsEntry) => new Date(e.dueDate) <= cutoffDate || e.paidAt !== null)
+    : (() => {
+        const now = new Date()
+        const from = new Date(now)
+        from.setFullYear(from.getFullYear() - viewYears)
+        const to = new Date(now)
+        to.setFullYear(to.getFullYear() + viewYears)
+        return entries.filter((e: SavingsEntry) => {
+          const d = new Date(e.dueDate)
+          return d >= from && d <= to
+        })
+      })()
 
   return (
     <div className="p-6 max-w-4xl">
