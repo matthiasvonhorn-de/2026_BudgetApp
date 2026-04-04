@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import { withHandler } from '@/lib/api/handler'
-
-const schema = z.object({
-  statementBalance: z.number(),
-  clearedTransactionIds: z.array(z.string()),
-})
+import { reconcileAccountSchema } from '@/lib/schemas/accounts'
 
 export const POST = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
   const body = await request.json()
-  const { statementBalance, clearedTransactionIds } = schema.parse(body)
+  const { statementBalance, clearedTransactionIds } = reconcileAccountSchema.parse(body)
 
   const result = await prisma.$transaction(async (tx) => {
     // Transaktionen als RECONCILED markieren

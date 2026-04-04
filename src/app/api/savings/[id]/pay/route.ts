@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
-
-const PaySchema = z.object({
-  paidUntil: z.string(), // ISO date string "YYYY-MM-DD"
-})
+import { paySavingsSchema } from '@/lib/schemas/savings'
 
 export const POST = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
   const body = await request.json()
-  const { paidUntil } = PaySchema.parse(body)
+  const { paidUntil } = paySavingsSchema.parse(body)
   const cutoff = new Date(paidUntil)
   cutoff.setHours(23, 59, 59, 999)
 

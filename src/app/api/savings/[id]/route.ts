@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import { generateSavingsSchedule, addMonths } from '@/lib/savings/schedule'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
-
-const UpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  color: z.string().optional(),
-  accountNumber: z.string().nullable().optional(),
-  linkedAccountId: z.string().nullable().optional(),
-  categoryId: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
-  interestRate: z.number().min(0).optional(),
-})
+import { updateSavingsSchema } from '@/lib/schemas/savings'
 
 export const GET = withHandler(async (_, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
@@ -56,7 +46,7 @@ export const GET = withHandler(async (_, ctx) => {
 export const PUT = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
   const body = await request.json()
-  const data = UpdateSchema.parse(body)
+  const data = updateSavingsSchema.parse(body)
 
   const config = await prisma.savingsConfig.findUnique({
     where: { accountId: id },
