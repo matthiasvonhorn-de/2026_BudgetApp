@@ -58,6 +58,7 @@ src/hooks/              # Custom React hooks
 
 ## Conventions
 
+- **Select dropdowns**: Always use `<AppSelect>` from `@/components/ui/app-select` instead of raw `<Select>`. It takes an `options` array (or `groups` for grouped options) and automatically handles label resolution — preventing the bug where closed selects show raw CUID IDs instead of human-readable names. Only use the raw `<Select>` from `@/components/ui/select` when you need custom render content inside items (icons, badges, etc.).
 - **Currency**: Always use `useFormatCurrency()` hook from `src/hooks/`.
 - **Month names**: Always use `getMonthName(month, year)` from `@/lib/budget/calculations`.
 - **Dropdowns**: Show human-readable labels (use `ACCOUNT_TYPE_LABELS` etc.), never raw enum values.
