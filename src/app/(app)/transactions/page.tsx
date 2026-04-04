@@ -33,7 +33,7 @@ export default function TransactionsPage() {
 
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ['transactions', debouncedSearch],
-    queryFn: () => fetch(`/api/transactions?search=${encodeURIComponent(debouncedSearch)}&limit=200`).then(r => r.json()),
+    queryFn: () => fetch(`/api/transactions?search=${encodeURIComponent(debouncedSearch)}&limit=10000`).then(r => r.json()),
   })
 
   const deleteMutation = useMutation({

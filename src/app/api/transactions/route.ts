@@ -10,7 +10,8 @@ export const GET = withHandler(async (request: Request) => {
   const from = searchParams.get('from')
   const to = searchParams.get('to')
   const search = searchParams.get('search')
-  const limit = parseInt(searchParams.get('limit') ?? '100')
+  const limitParam = searchParams.get('limit')
+  const limit = limitParam ? parseInt(limitParam) : undefined
 
   const transactions = await prisma.transaction.findMany({
     where: {
