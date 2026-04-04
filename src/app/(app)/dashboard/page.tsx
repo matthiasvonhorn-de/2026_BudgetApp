@@ -5,8 +5,9 @@ import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { useUIStore } from '@/store/useUIStore'
 import { getMonthName } from '@/lib/budget/calculations'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -44,7 +45,7 @@ export default function DashboardPage() {
   const fmt = useFormatCurrency()
   const { locale, currency } = useSettingsStore()
   const fmtCompact = (v: number) => new Intl.NumberFormat(locale, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(v)
-  const { budgetYear, budgetMonth } = useUIStore()
+  const { budgetYear, budgetMonth, goToPrevMonth, goToNextMonth } = useUIStore()
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['accounts'],
@@ -84,8 +85,19 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-1">Dashboard</h1>
-      <p className="text-muted-foreground text-sm mb-6">{getMonthName(budgetMonth, budgetYear)}</p>
+      <div className="flex items-center gap-3 mb-6">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <span className="text-muted-foreground">—</span>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevMonth}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-muted-foreground w-36 text-center">{getMonthName(budgetMonth, budgetYear)}</span>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNextMonth}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { withHandler } from '@/lib/api/handler'
 
 const ruleSchema = z.object({
   name: z.string().min(1),
@@ -12,31 +13,20 @@ const ruleSchema = z.object({
   isActive: z.boolean().default(true),
 })
 
-export async function GET() {
-  try {
-    const rules = await prisma.categoryRule.findMany({
-      include: { category: { select: { id: true, name: true, color: true } } },
-      orderBy: [{ priority: 'desc' }, { name: 'asc' }],
-    })
-    return NextResponse.json(rules)
-  } catch {
-    return NextResponse.json({ error: 'Fehler' }, { status: 500 })
-  }
-}
+export const GET = withHandler(async () => {
+  const rules = await prisma.categoryRule.findMany({
+    include: { category: { select: { id: true, name: true, color: true } } },
+    orderBy: [{ priority: 'desc' }, { name: 'asc' }],
+  })
+  return NextResponse.json(rules)
+})
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json()
-    const data = ruleSchema.parse(body)
-    const rule = await prisma.categoryRule.create({
-      data,
-      include: { category: true },
-    })
-    return NextResponse.json(rule, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Fehler' }, { status: 500 })
-  }
-}
+export const POST = withHandler(async (request: Request) => {
+  const body = await request.json()
+  const data = ruleSchema.parse(body)
+  const rule = await prisma.categoryRule.create({
+    data,
+    include: { category: true },
+  })
+  return NextResponse.json(rule, { status: 201 })
+})

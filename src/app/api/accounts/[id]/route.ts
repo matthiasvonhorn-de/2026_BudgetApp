@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { withHandler } from '@/lib/api/handler'
+import { DomainError } from '@/lib/api/errors'
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -12,48 +14,28 @@ const updateSchema = z.object({
   currentBalance: z.number().optional(),
 })
 
-export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  try {
-    const account = await prisma.account.findUnique({
-      where: { id },
-      include: {
-        transactions: {
-          orderBy: { date: 'desc' },
-          take: 50,
-          include: { category: true },
-        },
-      },
-    })
-    if (!account) return NextResponse.json({ error: 'Konto nicht gefunden' }, { status: 404 })
+export const GET = withHandler(async (_, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params
+  const account = await prisma.account.findUnique({
+    where: { id },
+    include: {
+      transactions: { orderBy: { date: 'desc' }, take: 50, include: { category: true } },
+    },
+  })
+  if (!account) throw new DomainError('Konto nicht gefunden', 404)
+  return NextResponse.json(account)
+})
 
-    return NextResponse.json(account)
-  } catch {
-    return NextResponse.json({ error: 'Fehler' }, { status: 500 })
-  }
-}
+export const PUT = withHandler(async (request: Request, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params
+  const body = await request.json()
+  const data = updateSchema.parse(body)
+  const account = await prisma.account.update({ where: { id }, data })
+  return NextResponse.json(account)
+})
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  try {
-    const body = await request.json()
-    const data = updateSchema.parse(body)
-    const account = await prisma.account.update({ where: { id }, data })
-    return NextResponse.json(account)
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Fehler beim Aktualisieren' }, { status: 500 })
-  }
-}
-
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  try {
-    await prisma.account.update({ where: { id }, data: { isActive: false } })
-    return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: 'Fehler beim Löschen' }, { status: 500 })
-  }
-}
+export const DELETE = withHandler(async (_, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params
+  await prisma.account.update({ where: { id }, data: { isActive: false } })
+  return NextResponse.json({ success: true })
+})
