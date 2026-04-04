@@ -18,12 +18,7 @@ import { formatDate } from '@/lib/utils'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { TransactionFormDialog } from '@/components/transactions/TransactionFormDialog'
 import { toast } from 'sonner'
-
-interface LoanPaymentRef {
-  loanId: string
-  periodNumber: number
-  loan: { name: string }
-}
+import type { Transaction, TransactionPage, LoanPaymentRef } from '@/types/api'
 
 const PAGE_SIZES = [100, 250, 500, 1000, 0] as const
 
@@ -54,7 +49,7 @@ export default function TransactionsPage() {
     return () => clearTimeout(t)
   }, [search])
 
-  const { data: result, isLoading, isPlaceholderData } = useQuery({
+  const { data: result, isLoading, isPlaceholderData } = useQuery<TransactionPage>({
     queryKey: ['transactions', debouncedSearch, page, pageSize],
     queryFn: () => {
       const params = new URLSearchParams()
@@ -82,7 +77,7 @@ export default function TransactionsPage() {
     },
   })
 
-  const handleDeleteClick = (t: any) => {
+  const handleDeleteClick = (t: Transaction) => {
     if (t.loanPayment) {
       setPendingDelete({ id: t.id, loanPayment: t.loanPayment })
     } else {
@@ -145,7 +140,7 @@ export default function TransactionsPage() {
               <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Laden...</td></tr>
             ) : transactions.length === 0 ? (
               <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Keine Transaktionen gefunden</td></tr>
-            ) : transactions.map((t: any) => (
+            ) : transactions.map((t: Transaction) => (
               <tr key={t.id} className="border-t hover:bg-muted/50">
                 <td className="p-3 text-muted-foreground whitespace-nowrap">{formatDate(t.date)}</td>
                 <td className="p-3">

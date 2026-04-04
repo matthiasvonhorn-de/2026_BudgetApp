@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { calcAnnuityFromRates, generateSchedule } from '@/lib/loans/amortization'
 import { withHandler } from '@/lib/api/handler'
+import { roundCents } from '@/lib/money'
 
 const CreateLoanSchema = z.object({
   name: z.string().min(1),
@@ -41,9 +42,9 @@ export const GET = withHandler(async () => {
       payments: undefined,
       paidUntil: loan.paidUntil ? loan.paidUntil.toISOString().slice(0, 10) : null,
       stats: {
-        totalInterestPaid: Math.round(totalInterestPaid * 100) / 100,
-        totalPrincipalPaid: Math.round((totalPrincipalPaid + extraPaid) * 100) / 100,
-        remainingBalance: Math.round(remainingBalance * 100) / 100,
+        totalInterestPaid: roundCents(totalInterestPaid),
+        totalPrincipalPaid: roundCents(totalPrincipalPaid + extraPaid),
+        remainingBalance: roundCents(remainingBalance),
         periodsPaid: paidRows.length,
         totalPeriods: loan.payments.length,
         nextDueDate: nextUnpaid?.dueDate ?? null,
@@ -79,7 +80,7 @@ export const POST = withHandler(async (request: Request) => {
       initialRepaymentRate: repaymentRate,
       termMonths: data.termMonths,
       startDate,
-      monthlyPayment: Math.round(monthlyPayment * 100) / 100,
+      monthlyPayment: roundCents(monthlyPayment),
       accountId: data.accountId ?? null,
       categoryId: data.categoryId ?? null,
       notes: data.notes ?? null,

@@ -15,6 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import type { Account } from '@/types/api'
 
 const schema = z.object({
   name: z.string().min(1, 'Name ist erforderlich'),
@@ -37,7 +38,7 @@ type FormValues = {
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  account?: any
+  account?: Account
 }
 
 export function AccountFormDialog({ open, onOpenChange, account }: Props) {
@@ -60,7 +61,9 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
   useEffect(() => {
     if (open) {
       form.reset(account ? {
-        ...account,
+        name: account.name,
+        type: account.type as FormValues['type'],
+        color: account.color,
         bank: account.bank ?? '',
         iban: account.iban ?? '',
         currentBalance: Math.round((account.currentBalance ?? 0) * 100) / 100,

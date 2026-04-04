@@ -20,6 +20,8 @@ export interface SavingsScheduleRow {
   scheduledBalance: number
 }
 
+import { roundCents } from '@/lib/money'
+
 export function addMonths(date: Date, months: number): Date {
   const d = new Date(date)
   d.setMonth(d.getMonth() + months)
@@ -83,10 +85,10 @@ export function generateSavingsSchedule(params: SavingsScheduleParams): SavingsS
 
     counters[event.type]++
     const amount = event.type === 'INTEREST'
-      ? Math.round(balance * interestPeriodRate * 100) / 100
+      ? roundCents(balance * interestPeriodRate)
       : contributionAmount
 
-    balance = Math.round((balance + amount) * 100) / 100
+    balance = roundCents(balance + amount)
 
     rows.push({
       entryType: event.type,

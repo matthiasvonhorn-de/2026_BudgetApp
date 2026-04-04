@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
+import { roundCents } from '@/lib/money'
 
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
@@ -58,8 +59,8 @@ export const GET = withHandler(async (request: Request) => {
   }, 0)
 
   return NextResponse.json({
-    totalAssets: Math.round(totalAssets * 100) / 100,
-    totalDebts: Math.round(totalDebts * 100) / 100,
-    netWorth: Math.round((totalAssets - totalDebts) * 100) / 100,
+    totalAssets: roundCents(totalAssets),
+    totalDebts: roundCents(totalDebts),
+    netWorth: roundCents(totalAssets - totalDebts),
   })
 })

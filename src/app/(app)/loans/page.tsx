@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { TrendingDown, Calendar, Euro, Percent } from 'lucide-react'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { formatDate } from '@/lib/utils'
+import type { Loan } from '@/types/api'
 
 const TYPE_LABELS: Record<string, string> = {
   ANNUITAETENDARLEHEN: 'Annuitätendarlehen',
@@ -50,8 +51,8 @@ export default function LoansPage() {
       <h1 className="text-2xl font-bold mb-6">Bankkredite</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {loans.map((loan: any) => {
-          const stats = loan.stats
+        {loans.map((loan: Loan) => {
+          const stats = loan.stats!
           const progress = loan.termMonths > 0
             ? Math.round((stats.periodsPaid / stats.totalPeriods) * 100)
             : 0

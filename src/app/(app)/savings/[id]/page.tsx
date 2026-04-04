@@ -8,6 +8,7 @@ import { ArrowLeft, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import type { SavingsEntry } from '@/types/api'
 import { format } from 'date-fns'
 import { de } from 'date-fns/locale'
 
@@ -89,7 +90,7 @@ export default function SavingsDetailPage() {
 
   const cfg = data
   const account = cfg.account
-  const entries: any[] = cfg.entries ?? []
+  const entries: SavingsEntry[] = cfg.entries ?? []
 
   const cutoffDate = viewYears === null ? null : (() => {
     const d = new Date()
@@ -99,7 +100,7 @@ export default function SavingsDetailPage() {
 
   const visibleEntries = cutoffDate === null
     ? entries
-    : entries.filter((e: any) => new Date(e.dueDate) <= cutoffDate || e.paidAt !== null)
+    : entries.filter((e: SavingsEntry) => new Date(e.dueDate) <= cutoffDate || e.paidAt !== null)
 
   return (
     <div className="p-6 max-w-4xl">
@@ -190,7 +191,7 @@ export default function SavingsDetailPage() {
                 </td>
               </tr>
             )}
-            {visibleEntries.map((entry: any) => {
+            {visibleEntries.map((entry: SavingsEntry) => {
               const isInterest = entry.entryType === 'INTEREST'
               const isPaid = entry.paidAt !== null
               // initialized = marked paid during account creation, no transaction record

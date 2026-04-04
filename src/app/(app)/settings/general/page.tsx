@@ -15,9 +15,10 @@ import { Check, Plus, Pencil, Trash2, GripVertical } from 'lucide-react'
 import { AccountFormDialog } from '@/components/accounts/AccountFormDialog'
 import { SavingsFormDialog } from '@/components/accounts/SavingsFormDialog'
 import { ACCOUNT_TYPE_LABELS } from '@/lib/utils'
+import type { Account } from '@/types/api'
 
 interface AccountRowProps {
-  account: any
+  account: Account
   isReordering: boolean
   fmt: (n: number) => string
   onEdit: () => void
@@ -80,7 +81,7 @@ export default function GeneralSettingsPage() {
   const fmt = useFormatCurrency()
   const qc = useQueryClient()
   const sensors = useSensors(useSensor(PointerSensor))
-  const [accountDialog, setAccountDialog] = useState<{ open: boolean; account?: any }>({ open: false })
+  const [accountDialog, setAccountDialog] = useState<{ open: boolean; account?: Account }>({ open: false })
   const [savingsDialog, setSavingsDialog] = useState(false)
 
   const { data: accounts = [], isLoading } = useQuery({
@@ -143,9 +144,9 @@ export default function GeneralSettingsPage() {
             <p className="text-sm text-muted-foreground">Noch keine Konten angelegt.</p>
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-              <SortableContext items={localAccounts.map((a: any) => a.id)} strategy={verticalListSortingStrategy}>
+              <SortableContext items={localAccounts.map((a: Account) => a.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-2">
-                  {localAccounts.map((a: any) => (
+                  {localAccounts.map((a: Account) => (
                     <SortableAccountRow
                       key={a.id}
                       account={a}

@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { format } from 'date-fns'
 import { useSettingsStore } from '@/store/useSettingsStore'
+import type { Account } from '@/types/api'
 
 const schema = z.object({
   date: z.string().min(1),
@@ -66,7 +67,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
   const [transferGroupId, setTransferGroupId] = useState('')
   const [selectedGroupId, setSelectedGroupId] = useState('')
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
@@ -248,13 +249,13 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                         form.setValue('categoryId', '')
                       }}
                       value={field.value}
-                      items={accounts.map((a: any) => ({ value: a.id, label: a.name }))}
+                      items={accounts.map((a: Account) => ({ value: a.id, label: a.name }))}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Quellkonto wählen" />
                       </SelectTrigger>
                       <SelectContent>
-                        {accounts.map((a: any) => (
+                        {accounts.map((a: Account) => (
                           <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -280,8 +281,8 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                     </SelectTrigger>
                     <SelectContent>
                       {accounts
-                        .filter((a: any) => a.id !== form.watch('accountId'))
-                        .map((a: any) => (
+                        .filter((a: Account) => a.id !== form.watch('accountId'))
+                        .map((a: Account) => (
                           <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                         ))}
                     </SelectContent>
@@ -340,13 +341,13 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                       <Select
                         onValueChange={(v) => v && field.onChange(v)}
                         value={field.value}
-                        items={accounts.map((a: any) => ({ value: a.id, label: a.name }))}
+                        items={accounts.map((a: Account) => ({ value: a.id, label: a.name }))}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Konto wählen" />
                         </SelectTrigger>
                         <SelectContent>
-                          {accounts.map((a: any) => (
+                          {accounts.map((a: Account) => (
                             <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                           ))}
                         </SelectContent>

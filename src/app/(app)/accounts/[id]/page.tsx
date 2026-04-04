@@ -20,6 +20,7 @@ import { ReconcileDialog } from '@/components/accounts/ReconcileDialog'
 import { SubAccountsSection } from '@/components/accounts/SubAccountsSection'
 import { AccountBudgetTab } from '@/components/accounts/AccountBudgetTab'
 import { TransactionFormDialog } from '@/components/transactions/TransactionFormDialog'
+import type { Transaction } from '@/types/api'
 
 const TABS = ['Transaktionen', 'Unterkonten', 'Budget'] as const
 type Tab = typeof TABS[number]
@@ -168,7 +169,7 @@ export default function AccountDetailPage() {
               <tbody>
                 {transactions.length === 0 ? (
                   <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">Keine Transaktionen</td></tr>
-                ) : transactions.map((t: any) => (
+                ) : transactions.map((t: Transaction) => (
                   <tr key={t.id} className="border-t hover:bg-muted/50">
                     <td className="p-3 text-muted-foreground">{formatDate(t.date)}</td>
                     <td className="p-3">

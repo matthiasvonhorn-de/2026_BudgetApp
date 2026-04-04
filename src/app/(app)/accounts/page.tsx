@@ -7,6 +7,7 @@ import { SortableAccountCard } from '@/components/accounts/SortableAccountCard'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useAccountReorder } from '@/hooks/useAccountReorder'
 import { Button } from '@/components/ui/button'
+import type { Account } from '@/types/api'
 
 export default function AccountsPage() {
   const fmt = useFormatCurrency()
@@ -20,7 +21,7 @@ export default function AccountsPage() {
   const { isReordering, localAccounts, startReorder, cancelReorder, saveReorder, handleDragEnd, isSaving } =
     useAccountReorder(accounts)
 
-  const totalBalance = localAccounts.reduce((sum: number, a: any) => sum + a.currentBalance, 0)
+  const totalBalance = localAccounts.reduce((sum, a) => sum + a.currentBalance, 0 as number)
 
   return (
     <div className="p-6">
@@ -64,9 +65,9 @@ export default function AccountsPage() {
         </div>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={localAccounts.map((a: any) => a.id)} strategy={rectSortingStrategy}>
+          <SortableContext items={localAccounts.map((a: Account) => a.id)} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {localAccounts.map((account: any) => (
+              {localAccounts.map((account: Account) => (
                 <SortableAccountCard key={account.id} account={account} isReordering={isReordering} />
               ))}
             </div>

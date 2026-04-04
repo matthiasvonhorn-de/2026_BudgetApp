@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import type { Account } from '@/types/api'
 
 interface SavingsForm {
   name: string
@@ -103,7 +104,7 @@ export function SavingsFormDialog({ open, onOpenChange }: Props) {
     enabled: open,
   })
 
-  const giroAccounts = accounts.filter((a: any) =>
+  const giroAccounts = accounts.filter((a: Account) =>
     !['SPARPLAN', 'FESTGELD'].includes(a.type) && a.isActive
   )
 
@@ -300,12 +301,12 @@ export function SavingsFormDialog({ open, onOpenChange }: Props) {
                 <Select
                   value={form.linkedAccountId}
                   onValueChange={(v: string | null) => { set('linkedAccountId', v ?? ''); set('categoryId', '') }}
-                  items={giroAccounts.map((a: any) => ({ value: a.id, label: a.name }))}
+                  items={giroAccounts.map((a: Account) => ({ value: a.id, label: a.name }))}
                 >
                   <SelectTrigger><SelectValue placeholder="Kein Konto (optional)" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">Kein Konto</SelectItem>
-                    {giroAccounts.map((a: any) => (
+                    {giroAccounts.map((a: Account) => (
                       <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                     ))}
                   </SelectContent>
