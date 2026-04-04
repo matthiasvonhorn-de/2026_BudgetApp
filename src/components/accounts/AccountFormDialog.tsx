@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { AppSelect } from '@/components/ui/app-select'
 import type { Account, AccountType } from '@/types/api'
 
 const ALL_TYPES: { value: AccountType; label: string }[] = [
@@ -478,22 +479,15 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
                     {/* Verknüpftes Girokonto */}
                     <div className="space-y-1.5">
                       <Label>Verknüpftes Girokonto</Label>
-                      <Select
+                      <AppSelect
                         value={form.linkedAccountId}
-                        onValueChange={(v: string | null) => { set('linkedAccountId', v ?? ''); set('categoryId', '') }}
-                        itemToStringLabel={(v: string) => {
-                          if (!v) return 'Kein Konto'
-                          return giroAccounts.find(a => a.id === v)?.name ?? v
-                        }}
-                      >
-                        <SelectTrigger><SelectValue placeholder="Kein Konto (optional)" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="">Kein Konto</SelectItem>
-                          {giroAccounts.map(a => (
-                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onValueChange={(v) => { set('linkedAccountId', v ?? ''); set('categoryId', '') }}
+                        options={[
+                          { value: '', label: 'Kein Konto' },
+                          ...giroAccounts.map(a => ({ value: a.id, label: a.name })),
+                        ]}
+                        placeholder="Kein Konto (optional)"
+                      />
                       <p className="text-xs text-muted-foreground">
                         Wenn verknüpft: Sparraten werden dort als Ausgabe gebucht
                       </p>
@@ -503,31 +497,18 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
                     {form.linkedAccountId && (
                       <div className="space-y-1.5">
                         <Label>Buchungskategorie</Label>
-                        <Select
+                        <AppSelect
                           value={form.categoryId}
-                          onValueChange={(v: string | null) => set('categoryId', v ?? '')}
-                          itemToStringLabel={(v: string) => {
-                            if (!v) return 'Keine Kategorie'
-                            for (const g of categoryGroups) {
-                              const c = g.categories.find(c => c.id === v)
-                              if (c) return c.name
-                            }
-                            return v
-                          }}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Keine Kategorie (optional)" /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">Keine Kategorie</SelectItem>
-                            {categoryGroups.map(g => (
-                              <div key={g.id}>
-                                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{g.name}</div>
-                                {g.categories.map(c => (
-                                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                ))}
-                              </div>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          onValueChange={(v) => set('categoryId', v ?? '')}
+                          groups={[
+                            { label: '', options: [{ value: '', label: 'Keine Kategorie' }] },
+                            ...categoryGroups.map(g => ({
+                              label: g.name,
+                              options: g.categories.map(c => ({ value: c.id, label: c.name })),
+                            })),
+                          ]}
+                          placeholder="Keine Kategorie (optional)"
+                        />
                       </div>
                     )}
                   </>
