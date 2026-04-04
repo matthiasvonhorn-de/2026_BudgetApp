@@ -116,7 +116,7 @@ export async function createSavings(data: CreateInput) {
         name: data.name,
         type: data.savingsType,
         color: data.color ?? '#10b981',
-        currentBalance: roundCents(initialBalance - upfrontFee),
+        currentBalance: initialBalance,
         isActive: true,
       },
     })
@@ -352,7 +352,8 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
         orderBy: [{ dueDate: 'asc' }, { entryType: 'asc' }],
       })
 
-      let runningBalance = config.initialBalance - newFee
+      // Start from initialBalance — the FEE entry in the schedule handles the deduction
+      let runningBalance = config.initialBalance
       for (const entry of rebuiltEntries) {
         runningBalance = roundCents(runningBalance + entry.scheduledAmount)
         if (Math.abs(entry.scheduledBalance - runningBalance) > 0.001) {
@@ -369,7 +370,7 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
         .sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime())[0]
       if (lastPaid) {
         // Recalculate the correct balance for the last paid entry
-        let bal = config.initialBalance - newFee
+        let bal = config.initialBalance
         for (const e of rebuiltEntries) {
           bal = roundCents(bal + e.scheduledAmount)
           if (e.id === lastPaid.id) break
