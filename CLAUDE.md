@@ -65,6 +65,15 @@ src/hooks/              # Custom React hooks
 - **New dialogs/modals**: Standalone components in `src/components/[feature]/`.
 - **Path alias**: `@/*` → `src/*`.
 
+## Model Usage
+
+Always use high effort (extended thinking). Both models benefit from deeper reasoning.
+
+- **Specs, architecture, brainstorming, complex decisions**: Use Opus (spawn Agent with `model: "opus"`)
+- **Implementation, refactoring, bugfixes, routine tasks**: Use Sonnet (default)
+
+When the task requires thinking through trade-offs, designing data models, writing specs, or making architectural choices → delegate to an Opus agent. Once the plan is clear and approved → implement with Sonnet.
+
 ## Development Process
 
 Spec-driven development: before any implementation, first work out a specification and save it to `docs/superpowers/specs/`. Only start implementation after the user has approved the spec.

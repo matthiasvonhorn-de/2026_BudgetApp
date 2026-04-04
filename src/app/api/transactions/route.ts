@@ -10,34 +10,39 @@ export const GET = withHandler(async (request: Request) => {
   const from = searchParams.get('from')
   const to = searchParams.get('to')
   const search = searchParams.get('search')
-  const limitParam = searchParams.get('limit')
-  const limit = limitParam ? parseInt(limitParam) : undefined
+  const page = parseInt(searchParams.get('page') ?? '1')
+  const pageSize = parseInt(searchParams.get('pageSize') ?? '0') // 0 = all
 
-  const transactions = await prisma.transaction.findMany({
-    where: {
-      account: { isActive: true },
-      ...(accountId && { accountId }),
-      ...(categoryId && { categoryId }),
-      ...(from || to ? {
-        date: {
-          ...(from && { gte: new Date(from) }),
-          ...(to && { lte: new Date(to) }),
-        }
-      } : {}),
-      ...(search && {
-        OR: [
-          { description: { contains: search } },
-          { payee: { contains: search } },
-        ],
-      }),
-    },
-    include: {
-      account: { select: { id: true, name: true, color: true } },
-      category: { select: { id: true, name: true, color: true, type: true } },
-    },
-    orderBy: { date: 'desc' },
-    take: limit,
-  })
+  const where = {
+    account: { isActive: true },
+    ...(accountId && { accountId }),
+    ...(categoryId && { categoryId }),
+    ...(from || to ? {
+      date: {
+        ...(from && { gte: new Date(from) }),
+        ...(to && { lte: new Date(to) }),
+      }
+    } : {}),
+    ...(search && {
+      OR: [
+        { description: { contains: search } },
+        { payee: { contains: search } },
+      ],
+    }),
+  }
+
+  const [transactions, total] = await Promise.all([
+    prisma.transaction.findMany({
+      where,
+      include: {
+        account: { select: { id: true, name: true, color: true } },
+        category: { select: { id: true, name: true, color: true, type: true } },
+      },
+      orderBy: { date: 'desc' },
+      ...(pageSize > 0 && { skip: (page - 1) * pageSize, take: pageSize }),
+    }),
+    prisma.transaction.count({ where }),
+  ])
 
   // Kredit-Verknüpfung ermitteln (LoanPayment.transactionId → Transaction)
   const ids = transactions.map(t => t.id)
@@ -54,12 +59,12 @@ export const GET = withHandler(async (request: Request) => {
     : []
   const lpMap = new Map(loanPayments.map(lp => [lp.transactionId, lp]))
 
-  const result = transactions.map(t => ({
+  const data = transactions.map(t => ({
     ...t,
     loanPayment: lpMap.get(t.id) ?? null,
   }))
 
-  return NextResponse.json(result)
+  return NextResponse.json({ data, total, page, pageSize })
 })
 
 export const POST = withHandler(async (request: Request) => {

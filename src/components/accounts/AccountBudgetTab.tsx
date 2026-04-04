@@ -79,8 +79,8 @@ function CategoryActivityDialog({
   const { data: transactions = [], isLoading } = useQuery<any[]>({
     queryKey: ['transactions-detail', accountId, cat?.id, year, month],
     queryFn: () =>
-      fetch(`/api/transactions?accountId=${accountId}&categoryId=${cat!.id}&from=${from}&to=${to}&limit=500`)
-        .then(r => r.json()),
+      fetch(`/api/transactions?accountId=${accountId}&categoryId=${cat!.id}&from=${from}&to=${to}`)
+        .then(r => r.json().then(r => r.data)),
     enabled: open && !!cat,
   })
 

@@ -64,7 +64,7 @@ export default function DashboardPage() {
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['transactions-recent'],
-    queryFn: () => fetch('/api/transactions?limit=5').then(r => r.json()),
+    queryFn: () => fetch('/api/transactions?pageSize=5').then(r => r.json().then(r => r.data)),
   })
 
   const { data: monthlySummary = [] } = useQuery({

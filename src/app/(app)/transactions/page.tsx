@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
+import {
+  Pagination, PaginationContent, PaginationItem, PaginationLink,
+  PaginationPrevious, PaginationNext, PaginationEllipsis,
+} from '@/components/ui/pagination'
 import { formatDate } from '@/lib/utils'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { TransactionFormDialog } from '@/components/transactions/TransactionFormDialog'
@@ -18,23 +25,50 @@ interface LoanPaymentRef {
   loan: { name: string }
 }
 
+const PAGE_SIZES = [100, 250, 500, 1000, 0] as const
+
+function getPageNumbers(current: number, total: number): (number | 'ellipsis')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages: (number | 'ellipsis')[] = [1]
+  if (current > 3) pages.push('ellipsis')
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+    pages.push(i)
+  }
+  if (current < total - 2) pages.push('ellipsis')
+  pages.push(total)
+  return pages
+}
+
 export default function TransactionsPage() {
   const fmt = useFormatCurrency()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(100)
   const [pendingDelete, setPendingDelete] = useState<{ id: string; loanPayment: LoanPaymentRef } | null>(null)
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 300)
     return () => clearTimeout(t)
   }, [search])
 
-  const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ['transactions', debouncedSearch],
-    queryFn: () => fetch(`/api/transactions?search=${encodeURIComponent(debouncedSearch)}&limit=10000`).then(r => r.json()),
+  const { data: result, isLoading, isPlaceholderData } = useQuery({
+    queryKey: ['transactions', debouncedSearch, page, pageSize],
+    queryFn: () => {
+      const params = new URLSearchParams()
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      params.set('page', String(page))
+      params.set('pageSize', String(pageSize))
+      return fetch(`/api/transactions?${params}`).then(r => r.json())
+    },
+    placeholderData: (prev) => prev,
   })
+
+  const transactions = result?.data ?? []
+  const total = result?.total ?? 0
+  const totalPages = pageSize > 0 ? Math.ceil(total / pageSize) : 1
 
   const deleteMutation = useMutation({
     mutationFn: ({ id, revertLoan }: { id: string; revertLoan: boolean }) =>
@@ -66,16 +100,35 @@ export default function TransactionsPage() {
         </Button>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex items-center gap-4">
         <Input
           placeholder="Suchen nach Beschreibung oder Empfänger..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="max-w-sm"
         />
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-sm text-muted-foreground">Pro Seite:</span>
+          <Select
+            value={String(pageSize)}
+            onValueChange={v => { setPageSize(Number(v)); setPage(1) }}
+          >
+            <SelectTrigger className="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZES.map(size => (
+                <SelectItem key={size} value={String(size)}>
+                  {size === 0 ? 'Alle' : size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-sm text-muted-foreground">{total} gesamt</span>
+        </div>
       </div>
 
-      <div className="rounded-lg border overflow-hidden">
+      <div className={`rounded-lg border overflow-hidden ${isPlaceholderData ? 'opacity-60' : ''}`}>
         <table className="w-full text-sm">
           <thead className="bg-muted">
             <tr>
@@ -135,6 +188,47 @@ export default function TransactionsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {pageSize > 0 && totalPages > 1 && (
+        <div className="mt-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  text="Zurück"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className={page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              {getPageNumbers(page, totalPages).map((p, i) =>
+                p === 'ellipsis' ? (
+                  <PaginationItem key={`e${i}`}>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                ) : (
+                  <PaginationItem key={p}>
+                    <PaginationLink
+                      isActive={p === page}
+                      onClick={() => setPage(p)}
+                      className="cursor-pointer"
+                    >
+                      {p}
+                    </PaginationLink>
+                  </PaginationItem>
+                )
+              )}
+              <PaginationItem>
+                <PaginationNext
+                  text="Weiter"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  className={page >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       <TransactionFormDialog open={open} onOpenChange={setOpen} />
 
