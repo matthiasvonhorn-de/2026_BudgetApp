@@ -52,6 +52,11 @@ export default function DashboardPage() {
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
 
+  const { data: netWorth } = useQuery({
+    queryKey: ['net-worth', budgetYear, budgetMonth],
+    queryFn: () => fetch(`/api/reports/net-worth?year=${budgetYear}&month=${budgetMonth}`).then(r => r.json()),
+  })
+
   const { data: budgetData } = useQuery({
     queryKey: ['budget', budgetYear, budgetMonth],
     queryFn: () => fetch(`/api/budget/${budgetYear}/${budgetMonth}`).then(r => r.json()),
@@ -72,7 +77,6 @@ export default function DashboardPage() {
     queryFn: () => fetch(`/api/reports/category-spending?year=${budgetYear}&month=${budgetMonth}`).then(r => r.json()),
   })
 
-  const totalBalance = accounts.reduce((sum: number, a: any) => sum + a.currentBalance, 0)
   const summary = budgetData?.summary
 
   const chartData = monthlySummary.map((d: any) => ({
@@ -108,10 +112,13 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-2xl font-bold ${totalBalance < 0 ? 'text-destructive' : ''}`}>
-              {fmt(totalBalance)}
+            <p className={`text-2xl font-bold ${(netWorth?.netWorth ?? 0) < 0 ? 'text-destructive' : ''}`}>
+              {fmt(netWorth?.netWorth ?? 0)}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">{accounts.length} Konten</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Konten {fmt(netWorth?.totalAssets ?? 0)}
+              {(netWorth?.totalDebts ?? 0) > 0 && <> · Schulden −{fmt(netWorth?.totalDebts ?? 0)}</>}
+            </p>
           </CardContent>
         </Card>
 
