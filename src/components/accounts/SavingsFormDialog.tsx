@@ -19,6 +19,7 @@ interface SavingsForm {
   savingsType: 'SPARPLAN' | 'FESTGELD'
   color: string
   initialBalance: string
+  upfrontFee: string
   accountNumber: string
   interestRate: string
   interestFrequency: 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY'
@@ -37,6 +38,7 @@ const EMPTY: SavingsForm = {
   savingsType: 'SPARPLAN',
   color: '#10b981',
   initialBalance: '0',
+  upfrontFee: '0',
   accountNumber: '',
   interestRate: '',
   interestFrequency: 'MONTHLY',
@@ -123,6 +125,7 @@ export function SavingsFormDialog({ open, onOpenChange }: Props) {
         savingsType: form.savingsType,
         color: form.color,
         initialBalance: parseFloat(form.initialBalance || '0'),
+        upfrontFee: parseFloat(form.upfrontFee || '0'),
         accountNumber: form.accountNumber || null,
         interestRate: parseFloat(form.interestRate.replace(',', '.')) / 100,
         interestFrequency: form.interestFrequency,
@@ -215,6 +218,20 @@ export function SavingsFormDialog({ open, onOpenChange }: Props) {
               onChange={e => set('initialBalance', e.target.value)}
               placeholder="0"
             />
+          </div>
+
+          {/* Abschlussgebühr */}
+          <div className="space-y-1.5">
+            <Label>Abschlussgebühr (€)</Label>
+            <Input
+              type="number" min="0" step="10"
+              value={form.upfrontFee}
+              onChange={e => set('upfrontFee', e.target.value)}
+              placeholder="0"
+            />
+            <p className="text-xs text-muted-foreground">
+              Einmalige Gebühr — wird vom Startkapital abgezogen.
+            </p>
           </div>
 
           {/* Zinssatz + Zinsgutschrift-Frequenz */}

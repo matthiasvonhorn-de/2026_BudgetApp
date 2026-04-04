@@ -8,6 +8,7 @@ export const createSavingsSchema = z.object({
   color: z.string().optional(),
   savingsType,
   initialBalance: z.number().min(0).optional(),
+  upfrontFee: z.number().min(0).optional(),
   accountNumber: z.string().nullable().optional(),
   contributionAmount: z.number().min(0).optional(),
   contributionFrequency: frequency.nullable().optional(),
@@ -29,6 +30,7 @@ export const updateSavingsSchema = z.object({
   categoryId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   interestRate: z.number().min(0).optional(),
+  upfrontFee: z.number().min(0).optional(),
   initializedUntil: z.string().nullable().optional(),
 })
 

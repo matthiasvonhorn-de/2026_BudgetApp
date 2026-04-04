@@ -122,6 +122,7 @@ export default function SavingsDetailPage() {
             Zinsen {FREQ_LABELS[cfg.interestFrequency]}
             {cfg.savingsType === 'SPARPLAN' && cfg.contributionAmount > 0 &&
               ` · ${fmt(cfg.contributionAmount)} ${FREQ_LABELS[cfg.contributionFrequency ?? 'MONTHLY']}`}
+            {(cfg.upfrontFee ?? 0) > 0 && ` · Gebühr: ${fmt(cfg.upfrontFee)}`}
             {cfg.accountNumber && ` · ${cfg.accountNumber}`}
           </p>
         </div>
@@ -197,23 +198,26 @@ export default function SavingsDetailPage() {
             )}
             {visibleEntries.map((entry: SavingsEntry) => {
               const isInterest = entry.entryType === 'INTEREST'
+              const isFee = entry.entryType === 'FEE'
               const isPaid = entry.paidAt !== null
               // initialized = marked paid during account creation, no transaction record
               const isInitialized = isPaid && entry.transactionId === null
               return (
-                <tr key={entry.id} className={`border-t ${isInterest ? 'bg-muted/20' : ''}`}>
+                <tr key={entry.id} className={`border-t ${isInterest ? 'bg-muted/20' : ''} ${isFee ? 'bg-red-50 dark:bg-red-950/20' : ''}`}>
                   <td className="p-3 text-muted-foreground">
                     {format(new Date(entry.dueDate), 'dd.MM.yyyy', { locale: de })}
                   </td>
                   <td className="p-3">
-                    {isInterest ? (
+                    {isFee ? (
+                      <span className="text-xs text-red-600 dark:text-red-400 font-medium">Gebühr</span>
+                    ) : isInterest ? (
                       <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Zinsen</span>
                     ) : (
                       <span className="text-xs font-medium">Sparrate</span>
                     )}
                   </td>
-                  <td className="p-3 text-right text-emerald-600 dark:text-emerald-400">
-                    +{fmt(entry.scheduledAmount)}
+                  <td className={`p-3 text-right ${isFee ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {entry.scheduledAmount < 0 ? '' : '+'}{fmt(entry.scheduledAmount)}
                   </td>
                   <td className="p-3 text-right font-mono text-xs">
                     {fmt(entry.scheduledBalance)}
