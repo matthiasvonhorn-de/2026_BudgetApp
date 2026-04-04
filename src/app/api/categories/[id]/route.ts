@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { withHandler } from '@/lib/api/handler'
 
 const categorySchema = z.object({
   name: z.string().min(1).optional(),
@@ -14,28 +15,17 @@ const categorySchema = z.object({
   rolloverEnabled: z.boolean().optional(),
 })
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  try {
-    const body = await request.json()
-    const data = categorySchema.parse(body)
-    const category = await prisma.category.update({ where: { id }, data })
-    return NextResponse.json(category)
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
-    }
-    return NextResponse.json({ error: 'Fehler beim Aktualisieren' }, { status: 500 })
-  }
-}
+export const PUT = withHandler(async (request: Request, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params
+  const body = await request.json()
+  const data = categorySchema.parse(body)
+  const category = await prisma.category.update({ where: { id }, data })
+  return NextResponse.json(category)
+})
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  try {
-    // Soft delete
-    await prisma.category.update({ where: { id }, data: { isActive: false } })
-    return NextResponse.json({ success: true })
-  } catch {
-    return NextResponse.json({ error: 'Fehler beim Löschen' }, { status: 500 })
-  }
-}
+export const DELETE = withHandler(async (_, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params
+  // Soft delete
+  await prisma.category.update({ where: { id }, data: { isActive: false } })
+  return NextResponse.json({ success: true })
+})

@@ -1,22 +1,19 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { withHandler } from '@/lib/api/handler'
 
-export async function GET() {
-  try {
-    const groups = await prisma.subAccountGroup.findMany({
-      orderBy: { sortOrder: 'asc' },
-      include: {
-        subAccount: {
-          select: {
-            id: true,
-            name: true,
-            account: { select: { id: true, name: true } },
-          },
+export const GET = withHandler(async () => {
+  const groups = await prisma.subAccountGroup.findMany({
+    orderBy: { sortOrder: 'asc' },
+    include: {
+      subAccount: {
+        select: {
+          id: true,
+          name: true,
+          account: { select: { id: true, name: true } },
         },
       },
-    })
-    return NextResponse.json(groups)
-  } catch {
-    return NextResponse.json({ error: 'Fehler beim Laden' }, { status: 500 })
-  }
-}
+    },
+  })
+  return NextResponse.json(groups)
+})

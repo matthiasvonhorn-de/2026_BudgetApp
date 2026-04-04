@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { withHandler } from '@/lib/api/handler'
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  try {
-    await prisma.$transaction(async (tx) => {
-      // Verknüpfte Transaktion löschen (falls vorhanden)
-      await tx.transaction.deleteMany({ where: { subAccountEntryId: id } })
-      await tx.subAccountEntry.delete({ where: { id } })
-    })
-    return NextResponse.json({ success: true })
-  } catch (e) {
-    console.error(e)
-    return NextResponse.json({ error: 'Fehler beim Löschen' }, { status: 500 })
-  }
-}
+export const DELETE = withHandler(async (_, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params
+  await prisma.$transaction(async (tx) => {
+    // Verknüpfte Transaktion löschen (falls vorhanden)
+    await tx.transaction.deleteMany({ where: { subAccountEntryId: id } })
+    await tx.subAccountEntry.delete({ where: { id } })
+  })
+  return NextResponse.json({ success: true })
+})

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { withHandler } from '@/lib/api/handler'
 
 const transactionSchema = z.object({
   date: z.string(),
@@ -16,7 +17,7 @@ const transactionSchema = z.object({
   skipPairedTransfer: z.boolean().optional().default(false),
 })
 
-export async function GET(request: Request) {
+export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
   const accountId = searchParams.get('accountId')
   const categoryId = searchParams.get('categoryId')
@@ -25,161 +26,150 @@ export async function GET(request: Request) {
   const search = searchParams.get('search')
   const limit = parseInt(searchParams.get('limit') ?? '100')
 
-  try {
-    const transactions = await prisma.transaction.findMany({
-      where: {
-        account: { isActive: true },
-        ...(accountId && { accountId }),
-        ...(categoryId && { categoryId }),
-        ...(from || to ? {
-          date: {
-            ...(from && { gte: new Date(from) }),
-            ...(to && { lte: new Date(to) }),
-          }
-        } : {}),
-        ...(search && {
-          OR: [
-            { description: { contains: search } },
-            { payee: { contains: search } },
-          ],
-        }),
-      },
-      include: {
-        account: { select: { id: true, name: true, color: true } },
-        category: { select: { id: true, name: true, color: true, type: true } },
-      },
-      orderBy: { date: 'desc' },
-      take: limit,
-    })
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      account: { isActive: true },
+      ...(accountId && { accountId }),
+      ...(categoryId && { categoryId }),
+      ...(from || to ? {
+        date: {
+          ...(from && { gte: new Date(from) }),
+          ...(to && { lte: new Date(to) }),
+        }
+      } : {}),
+      ...(search && {
+        OR: [
+          { description: { contains: search } },
+          { payee: { contains: search } },
+        ],
+      }),
+    },
+    include: {
+      account: { select: { id: true, name: true, color: true } },
+      category: { select: { id: true, name: true, color: true, type: true } },
+    },
+    orderBy: { date: 'desc' },
+    take: limit,
+  })
 
-    // Kredit-Verknüpfung ermitteln (LoanPayment.transactionId → Transaction)
-    const ids = transactions.map(t => t.id)
-    const loanPayments = ids.length > 0
-      ? await prisma.loanPayment.findMany({
-          where: { transactionId: { in: ids } },
-          select: {
-            transactionId: true,
-            loanId: true,
-            periodNumber: true,
-            loan: { select: { name: true } },
+  // Kredit-Verknüpfung ermitteln (LoanPayment.transactionId → Transaction)
+  const ids = transactions.map(t => t.id)
+  const loanPayments = ids.length > 0
+    ? await prisma.loanPayment.findMany({
+        where: { transactionId: { in: ids } },
+        select: {
+          transactionId: true,
+          loanId: true,
+          periodNumber: true,
+          loan: { select: { name: true } },
+        },
+      })
+    : []
+  const lpMap = new Map(loanPayments.map(lp => [lp.transactionId, lp]))
+
+  const result = transactions.map(t => ({
+    ...t,
+    loanPayment: lpMap.get(t.id) ?? null,
+  }))
+
+  return NextResponse.json(result)
+})
+
+export const POST = withHandler(async (request: Request) => {
+  const body = await request.json()
+  const data = transactionSchema.parse(body)
+
+  const transaction = await prisma.$transaction(async (tx) => {
+    // Load category with sub-account link info
+    const category = data.categoryId
+      ? await tx.category.findUnique({
+          where: { id: data.categoryId },
+          include: {
+            subAccountGroup: {
+              include: { subAccount: { include: { account: true } } },
+            },
           },
         })
-      : []
-    const lpMap = new Map(loanPayments.map(lp => [lp.transactionId, lp]))
+      : null
 
-    const result = transactions.map(t => ({
-      ...t,
-      loanPayment: lpMap.get(t.id) ?? null,
-    }))
+    const linkedGroup = category?.subAccountGroup ?? null
+    const linkType = category?.subAccountLinkType ?? 'BOOKING'
 
-    return NextResponse.json(result)
-  } catch {
-    return NextResponse.json({ error: 'Fehler beim Laden' }, { status: 500 })
-  }
-}
+    // For TRANSFER link type, override the transaction type
+    const txType = linkedGroup && linkType === 'TRANSFER' && !data.skipSubAccountEntry ? 'TRANSFER' : data.type
 
-export async function POST(request: Request) {
-  try {
-    const body = await request.json()
-    const data = transactionSchema.parse(body)
+    // Create source transaction
+    const { skipSubAccountEntry: _skip1, skipPairedTransfer: _skip2, ...txData } = data
+    const t = await tx.transaction.create({
+      data: {
+        ...txData,
+        type: txType,
+        date: new Date(data.date),
+        categoryId: data.categoryId || null,
+      },
+      include: { account: true, category: true },
+    })
 
-    const transaction = await prisma.$transaction(async (tx) => {
-      // Load category with sub-account link info
-      const category = data.categoryId
-        ? await tx.category.findUnique({
-            where: { id: data.categoryId },
-            include: {
-              subAccountGroup: {
-                include: { subAccount: { include: { account: true } } },
-              },
-            },
-          })
-        : null
+    // Update source account balance
+    await tx.account.update({
+      where: { id: data.accountId },
+      data: { currentBalance: { increment: data.amount } },
+    })
 
-      const linkedGroup = category?.subAccountGroup ?? null
-      const linkType = category?.subAccountLinkType ?? 'BOOKING'
-
-      // For TRANSFER link type, override the transaction type
-      const txType = linkedGroup && linkType === 'TRANSFER' && !data.skipSubAccountEntry ? 'TRANSFER' : data.type
-
-      // Create source transaction
-      const { skipSubAccountEntry: _skip1, skipPairedTransfer: _skip2, ...txData } = data
-      const t = await tx.transaction.create({
+    if (linkedGroup && !data.skipSubAccountEntry) {
+      // Sub-account entry: expense on main account → income in sub-account
+      const entryAmount = -data.amount
+      const entry = await tx.subAccountEntry.create({
         data: {
-          ...txData,
-          type: txType,
           date: new Date(data.date),
-          categoryId: data.categoryId || null,
+          description: data.description,
+          amount: entryAmount,
+          fromBudget: true,
+          groupId: linkedGroup.id,
         },
-        include: { account: true, category: true },
+      })
+      await tx.transaction.update({
+        where: { id: t.id },
+        data: { subAccountEntryId: entry.id },
       })
 
-      // Update source account balance
-      await tx.account.update({
-        where: { id: data.accountId },
-        data: { currentBalance: { increment: data.amount } },
-      })
+      if (linkType === 'TRANSFER' && !data.skipPairedTransfer) {
+        // Create paired TRANSFER transaction on the target account
+        const targetAccountId = linkedGroup.subAccount.accountId
+        const pairedAmount = -data.amount  // opposite sign
 
-      if (linkedGroup && !data.skipSubAccountEntry) {
-        // Sub-account entry: expense on main account → income in sub-account
-        const entryAmount = -data.amount
-        const entry = await tx.subAccountEntry.create({
+        const paired = await tx.transaction.create({
           data: {
             date: new Date(data.date),
+            amount: pairedAmount,
             description: data.description,
-            amount: entryAmount,
-            fromBudget: true,
-            groupId: linkedGroup.id,
+            accountId: targetAccountId,
+            categoryId: data.categoryId || null,
+            type: 'TRANSFER',
+            status: data.status,
           },
         })
-        await tx.transaction.update({
-          where: { id: t.id },
-          data: { subAccountEntryId: entry.id },
+
+        // Update target account balance
+        await tx.account.update({
+          where: { id: targetAccountId },
+          data: { currentBalance: { increment: pairedAmount } },
         })
 
-        if (linkType === 'TRANSFER' && !data.skipPairedTransfer) {
-          // Create paired TRANSFER transaction on the target account
-          const targetAccountId = linkedGroup.subAccount.accountId
-          const pairedAmount = -data.amount  // opposite sign
+        // Link both transactions as a transfer pair
+        await tx.transaction.update({
+          where: { id: t.id },
+          data: { transferToId: paired.id },
+        })
 
-          const paired = await tx.transaction.create({
-            data: {
-              date: new Date(data.date),
-              amount: pairedAmount,
-              description: data.description,
-              accountId: targetAccountId,
-              categoryId: data.categoryId || null,
-              type: 'TRANSFER',
-              status: data.status,
-            },
-          })
-
-          // Update target account balance
-          await tx.account.update({
-            where: { id: targetAccountId },
-            data: { currentBalance: { increment: pairedAmount } },
-          })
-
-          // Link both transactions as a transfer pair
-          await tx.transaction.update({
-            where: { id: t.id },
-            data: { transferToId: paired.id },
-          })
-
-          return { ...t, transferToId: paired.id, subAccountEntryId: entry.id }
-        }
-
-        return { ...t, subAccountEntryId: entry.id }
+        return { ...t, transferToId: paired.id, subAccountEntryId: entry.id }
       }
 
-      return t
-    })
-
-    return NextResponse.json(transaction, { status: 201 })
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 })
+      return { ...t, subAccountEntryId: entry.id }
     }
-    return NextResponse.json({ error: 'Fehler beim Erstellen' }, { status: 500 })
-  }
-}
+
+    return t
+  })
+
+  return NextResponse.json(transaction, { status: 201 })
+})
