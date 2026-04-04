@@ -188,7 +188,7 @@ export const PUT = withHandler(async (req, ctx) => {
 
 **`GET /api/savings/[id]`** — pure read, delegates to `savingsService.getSavings()`. Lazy-extend logic is removed from `getSavings()`.
 
-**`POST /api/savings/[id]/extend`** — the server decides whether extension is needed. The existing endpoint at this path is updated to use the service:
+**`POST /api/savings/[id]/extend`** — **new** route handler (lazy-extend today only runs inside `GET /api/savings/[id]`). The POST body is empty; the server decides whether extension is needed and delegates to `savingsService.extendSchedule()`:
 
 ```ts
 // savingsService.extendSchedule(accountId) — full logic:
@@ -206,7 +206,7 @@ return { extended: result.count > 0, added: result.count }
 // which may differ when skipDuplicates skips existing entries.
 ```
 
-**Idempotency**: `skipDuplicates: true` handles concurrent/duplicate calls. The horizon check provides an early exit so no rows are generated unnecessarily.
+**Idempotency**: `skipDuplicates: true` is **new** compared to the current GET implementation (which used plain `createMany`); together with the horizon check it makes concurrent or repeated extend calls safe. The horizon check provides an early exit so no rows are generated unnecessarily.
 
 **UI change**: In `src/app/(app)/savings/[id]/page.tsx`, after the `useQuery` for savings data resolves, a one-shot `useMutation` posts to `/extend`. The result is not shown to the user; it triggers a query invalidation only if `extended: true`.
 
