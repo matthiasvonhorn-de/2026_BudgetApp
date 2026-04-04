@@ -1,23 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
-
-const updateSchema = z.object({
-  date: z.string().optional(),
-  amount: z.number().optional(),
-  description: z.string().min(1).optional(),
-  payee: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  categoryId: z.string().optional().nullable(),
-  status: z.enum(['PENDING', 'CLEARED', 'RECONCILED']).optional(),
-})
+import { updateTransactionSchema } from '@/lib/schemas/transactions'
 
 export const PUT = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
   const body = await request.json()
-  const data = updateSchema.parse(body)
+  const data = updateTransactionSchema.parse(body)
 
   const existing = await prisma.transaction.findUnique({
     where: { id },

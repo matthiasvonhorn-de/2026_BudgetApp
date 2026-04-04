@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -34,6 +34,19 @@ export default function SavingsDetailPage() {
     queryKey: ['savings', id],
     queryFn: () => fetch(`/api/savings/${id}`).then(r => r.json()),
   })
+
+  // For unlimited plans: ensure schedule covers 24 months ahead (idempotent)
+  const isUnlimited = data && !data.error && data.termMonths === null
+  useEffect(() => {
+    if (!isUnlimited) return
+    fetch(`/api/savings/${id}/extend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ months: 24 }),
+    }).then(r => r.json()).then(res => {
+      if (res.added > 0) qc.invalidateQueries({ queryKey: ['savings', id] })
+    })
+  }, [isUnlimited, id, qc])
 
   const payMutation = useMutation({
     mutationFn: (paidUntil: string) =>

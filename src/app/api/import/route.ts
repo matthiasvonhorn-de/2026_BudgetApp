@@ -1,24 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import { withHandler } from '@/lib/api/handler'
-
-const importSchema = z.object({
-  accountId: z.string(),
-  transactions: z.array(z.object({
-    date: z.string(),
-    amount: z.number(),
-    description: z.string(),
-    payee: z.string().optional().nullable(),
-    categoryId: z.string().optional().nullable(),
-    hash: z.string(),
-    type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']).default('EXPENSE'),
-  })),
-})
+import { importTransactionsSchema } from '@/lib/schemas/transactions'
 
 export const POST = withHandler(async (request: Request) => {
   const body = await request.json()
-  const { accountId, transactions } = importSchema.parse(body)
+  const { accountId, transactions } = importTransactionsSchema.parse(body)
 
   // Existierende Hashes prüfen (Duplikate)
   const existingHashes = await prisma.transaction.findMany({

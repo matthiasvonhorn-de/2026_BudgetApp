@@ -1,21 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import { withHandler } from '@/lib/api/handler'
-
-const transactionSchema = z.object({
-  date: z.string(),
-  amount: z.number(),
-  description: z.string().min(1),
-  payee: z.string().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  accountId: z.string(),
-  categoryId: z.string().optional().nullable(),
-  type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']).default('EXPENSE'),
-  status: z.enum(['PENDING', 'CLEARED', 'RECONCILED']).default('PENDING'),
-  skipSubAccountEntry: z.boolean().optional().default(false),
-  skipPairedTransfer: z.boolean().optional().default(false),
-})
+import { createTransactionSchema } from '@/lib/schemas/transactions'
 
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
@@ -77,7 +63,7 @@ export const GET = withHandler(async (request: Request) => {
 
 export const POST = withHandler(async (request: Request) => {
   const body = await request.json()
-  const data = transactionSchema.parse(body)
+  const data = createTransactionSchema.parse(body)
 
   const transaction = await prisma.$transaction(async (tx) => {
     // Load category with sub-account link info
