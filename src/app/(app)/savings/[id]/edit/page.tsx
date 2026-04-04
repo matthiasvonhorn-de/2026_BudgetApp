@@ -21,6 +21,7 @@ interface EditForm {
   linkedAccountId: string
   categoryId: string
   notes: string
+  initializedUntil: string
 }
 
 export default function SavingsEditPage() {
@@ -46,6 +47,7 @@ export default function SavingsEditPage() {
       linkedAccountId: data.linkedAccountId ?? '',
       categoryId: data.categoryId ?? '',
       notes: data.notes ?? '',
+      initializedUntil: '',
     })
   }, [data])
 
@@ -78,6 +80,7 @@ export default function SavingsEditPage() {
         linkedAccountId: form.linkedAccountId || null,
         categoryId: form.categoryId || null,
         notes: form.notes || null,
+        ...(form.initializedUntil && { initializedUntil: form.initializedUntil }),
       }
       const res = await fetch(`/api/savings/${id}`, {
         method: 'PUT',
@@ -100,6 +103,10 @@ export default function SavingsEditPage() {
   if (!data || data.error) return <div className="p-6 text-destructive">Sparkonto nicht gefunden.</div>
 
   const isSparplan = data.account.type === 'SPARPLAN'
+  const today = new Date().toISOString().slice(0, 10)
+  const hasUnpaidPastEntries = (data.entries ?? []).some(
+    (e: any) => e.paidAt === null && e.dueDate.slice(0, 10) <= today
+  )
   const originalRate = (data.interestRate * 100).toFixed(2)
   const rateChanged = form.interestRate !== originalRate
 
@@ -199,6 +206,21 @@ export default function SavingsEditPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* Bezahlt bis — nachträgliche Initialisierung */}
+        {hasUnpaidPastEntries && (
+          <div className="space-y-1.5">
+            <Label>Bezahlt bis</Label>
+            <Input
+              type="date"
+              value={form.initializedUntil}
+              onChange={e => set('initializedUntil', e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Markiert alle offenen Einträge bis zu diesem Datum als initialisiert (ohne Buchungen zu erstellen).
+            </p>
+          </div>
         )}
 
         {/* Notizen */}
