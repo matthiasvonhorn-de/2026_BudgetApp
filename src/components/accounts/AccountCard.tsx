@@ -15,6 +15,7 @@ interface AccountCardProps {
     color: string
     currentBalance: number
     _count?: { transactions: number }
+    _savingsProgress?: { paid: number; total: number }
   }
 }
 
@@ -45,11 +46,15 @@ export function AccountCard({ account }: AccountCardProps) {
           <p className={`text-2xl font-bold ${account.currentBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>
             {fmt(account.currentBalance)}
           </p>
-          {account._count && !SAVINGS_TYPES.has(account.type) && (
+          {SAVINGS_TYPES.has(account.type) && account._savingsProgress ? (
+            <p className="text-xs text-muted-foreground mt-1">
+              {account._savingsProgress.paid} / {account._savingsProgress.total} Zahlungen
+            </p>
+          ) : account._count ? (
             <p className="text-xs text-muted-foreground mt-1">
               {account._count.transactions} Transaktionen
             </p>
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </Link>
