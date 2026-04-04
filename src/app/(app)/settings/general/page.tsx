@@ -54,7 +54,7 @@ function SortableAccountRow({ account, isReordering, fmt, onEdit, onDelete }: Ac
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <span className={`text-sm font-semibold tabular-nums ${account.currentBalance < 0 ? 'text-destructive' : ''}`}>
+        <span className={`text-sm font-semibold tabular-nums ${account.currentBalance < 0 ? 'text-destructive' : ''}`} suppressHydrationWarning>
           {fmt(account.currentBalance)}
         </span>
         {!isReordering && (
@@ -180,7 +180,7 @@ export default function GeneralSettingsPage() {
               >
                 <span>{preset.label}</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-muted-foreground tabular-nums">
+                  <span className="text-muted-foreground tabular-nums" suppressHydrationWarning>
                     {new Intl.NumberFormat(preset.locale, { style: 'currency', currency: preset.currency }).format(1234.56)}
                   </span>
                   {isActive && <Check className="h-4 w-4 text-primary" />}
@@ -189,7 +189,7 @@ export default function GeneralSettingsPage() {
             )
           })}
           <p className="text-xs text-muted-foreground pt-2">
-            Vorschau aktuell: <span className="font-semibold">{fmt(1234.56)}</span>
+            Vorschau aktuell: <span className="font-semibold" suppressHydrationWarning>{fmt(1234.56)}</span>
           </p>
         </CardContent>
       </Card>
