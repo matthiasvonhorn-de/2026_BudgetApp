@@ -1,18 +1,14 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import { generateSavingsSchedule, addMonths } from '@/lib/savings/schedule'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
-
-const ExtendSchema = z.object({
-  months: z.number().int().min(1).max(360).default(24),
-})
+import { extendSavingsSchema } from '@/lib/schemas/savings'
 
 export const POST = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
   const body = await request.json().catch(() => ({}))
-  const { months } = ExtendSchema.parse(body)
+  const { months } = extendSavingsSchema.parse(body)
 
   const config = await prisma.savingsConfig.findUnique({
     where: { accountId: id },

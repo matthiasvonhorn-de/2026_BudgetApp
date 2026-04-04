@@ -1,26 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import { generateSavingsSchedule, addMonths } from '@/lib/savings/schedule'
 import { withHandler } from '@/lib/api/handler'
-
-const CreateSchema = z.object({
-  name: z.string().min(1),
-  color: z.string().optional(),
-  savingsType: z.enum(['SPARPLAN', 'FESTGELD']),
-  initialBalance: z.number().min(0).optional(),
-  accountNumber: z.string().nullable().optional(),
-  contributionAmount: z.number().min(0).optional(),
-  contributionFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUALLY']).nullable().optional(),
-  interestRate: z.number().min(0),
-  interestFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUALLY']),
-  startDate: z.string(),
-  termMonths: z.number().int().positive().nullable().optional(),
-  linkedAccountId: z.string().nullable().optional(),
-  categoryId: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
-  initializedUntil: z.string().nullable().optional(), // initialization cutoff date — no transactions created
-})
+import { createSavingsSchema } from '@/lib/schemas/savings'
 
 /**
  * For fixed-term plans: use termMonths exactly.
@@ -75,7 +57,7 @@ export const GET = withHandler(async () => {
 
 export const POST = withHandler(async (request: Request) => {
   const body = await request.json()
-  const data = CreateSchema.parse(body)
+  const data = createSavingsSchema.parse(body)
 
   const startDate = new Date(data.startDate)
   const initialBalance = data.initialBalance ?? 0

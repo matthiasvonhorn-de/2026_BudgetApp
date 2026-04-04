@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
 import { withHandler } from '@/lib/api/handler'
+import { createSubAccountSchema } from '@/lib/schemas/accounts'
 
 export const GET = withHandler(async (_, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
@@ -23,11 +23,7 @@ export const GET = withHandler(async (_, ctx) => {
 export const POST = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
   const body = await request.json()
-  const data = z.object({
-    name: z.string().min(1),
-    color: z.string().default('#6366f1'),
-    initialBalance: z.number().default(0),
-  }).parse(body)
+  const data = createSubAccountSchema.parse(body)
   const sub = await prisma.subAccount.create({ data: { ...data, accountId: id } })
   return NextResponse.json(sub, { status: 201 })
 })
