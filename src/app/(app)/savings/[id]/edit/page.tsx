@@ -170,6 +170,10 @@ export default function SavingsEditPage() {
               <Select
                 value={form.linkedAccountId}
                 onValueChange={(v: string | null) => { set('linkedAccountId', v ?? ''); set('categoryId', '') }}
+                itemToStringLabel={(v: string) => {
+                  if (!v) return 'Kein Konto'
+                  return giroAccounts.find((a: Account) => a.id === v)?.name ?? v
+                }}
               >
                 <SelectTrigger><SelectValue placeholder="Kein Konto (optional)" /></SelectTrigger>
                 <SelectContent>
@@ -190,6 +194,14 @@ export default function SavingsEditPage() {
                 <Select
                   value={form.categoryId}
                   onValueChange={(v: string | null) => set('categoryId', v ?? '')}
+                  itemToStringLabel={(v: string) => {
+                    if (!v) return 'Keine Kategorie'
+                    for (const g of categoryGroups) {
+                      const cat = g.categories.find(c => c.id === v)
+                      if (cat) return cat.name
+                    }
+                    return v
+                  }}
                 >
                   <SelectTrigger><SelectValue placeholder="Keine Kategorie (optional)" /></SelectTrigger>
                   <SelectContent>

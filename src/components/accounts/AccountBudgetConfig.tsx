@@ -257,7 +257,11 @@ function EditCategoryForm({
       </div>
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Gruppe</Label>
-        <Select value={groupId} onValueChange={(v: string | null) => setGroupId(v ?? groupId)}>
+        <Select
+          value={groupId}
+          onValueChange={(v: string | null) => setGroupId(v ?? groupId)}
+          itemToStringLabel={(v: string) => groups.find(g => g.id === v)?.name ?? v}
+        >
           <SelectTrigger className="h-7 text-xs w-full">
             <SelectValue>{groups.find(g => g.id === groupId)?.name ?? 'Keine Gruppe'}</SelectValue>
           </SelectTrigger>
@@ -268,7 +272,15 @@ function EditCategoryForm({
       </div>
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Unterkonto-Verknüpfung</Label>
-        <Select value={subAccountGroupId} onValueChange={(v: string | null) => setSubAccountGroupId(v ?? '__none__')}>
+        <Select
+          value={subAccountGroupId}
+          onValueChange={(v: string | null) => setSubAccountGroupId(v ?? '__none__')}
+          itemToStringLabel={(v: string) => {
+            if (v === '__none__') return 'Keine Verknüpfung'
+            const sg = subAccountGroups.find(s => s.id === v)
+            return sg ? `${sg.subAccount.name} · ${sg.name}` : v
+          }}
+        >
           <SelectTrigger className="h-7 text-xs w-full">
             <SelectValue>
               {subAccountGroupId === '__none__'

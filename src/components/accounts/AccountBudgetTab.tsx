@@ -230,6 +230,7 @@ function BookTransactionDialog({
               value={selAccountId}
               onValueChange={(v: string | null) => v && setSelAccountId(v)}
               items={accounts.map((a: Account) => ({ value: a.id, label: a.name }))}
+              itemToStringLabel={(v: string) => accounts.find((a: Account) => a.id === v)?.name ?? v}
             >
               <SelectTrigger>
                 <SelectValue placeholder="—" />

@@ -109,6 +109,10 @@ export function ImportStep3Categorize() {
                       // Base UI onValueChange passes string | null
                       disabled={t.skip}
                       items={allCategories.map(c => ({ value: c.id, label: c.name }))}
+                      itemToStringLabel={(v: string) => {
+                        if (!v) return 'Keine Kategorie'
+                        return allCategories.find(c => c.id === v)?.name ?? v
+                      }}
                     >
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="Kategorie..." />
