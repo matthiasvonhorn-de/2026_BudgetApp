@@ -45,7 +45,7 @@ export function AccountCard({ account }: AccountCardProps) {
           <p className={`text-2xl font-bold ${account.currentBalance < 0 ? 'text-destructive' : 'text-foreground'}`}>
             {fmt(account.currentBalance)}
           </p>
-          {account._count && (
+          {account._count && !SAVINGS_TYPES.has(account.type) && (
             <p className="text-xs text-muted-foreground mt-1">
               {account._count.transactions} Transaktionen
             </p>
