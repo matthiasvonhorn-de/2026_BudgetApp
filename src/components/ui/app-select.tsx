@@ -42,7 +42,7 @@ type AppSelectProps = {
   /** Currently selected value. */
   value?: string
   /** Called when the user picks an option. */
-  onValueChange?: (value: string) => void
+  onValueChange?: (value: string | null) => void
   /** Disable the entire select. */
   disabled?: boolean
   /** Trigger size variant. */
