@@ -213,7 +213,11 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
     data.upfrontFee !== undefined &&
     Math.abs(data.upfrontFee - config.upfrontFee) > 1e-9
 
-  const needsRebuild = interestRateChanged || feeChanged
+  const contributionChanged =
+    data.contributionAmount !== undefined &&
+    Math.abs(data.contributionAmount - config.contributionAmount) > 1e-9
+
+  const needsRebuild = interestRateChanged || feeChanged || contributionChanged
 
   await prisma.$transaction(async (tx) => {
     if (data.name !== undefined || data.color !== undefined) {
@@ -235,6 +239,7 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
         ...(data.notes !== undefined && { notes: data.notes }),
         ...(data.interestRate !== undefined && { interestRate: data.interestRate }),
         ...(data.upfrontFee !== undefined && { upfrontFee: data.upfrontFee }),
+        ...(data.contributionAmount !== undefined && { contributionAmount: data.contributionAmount }),
       },
     })
 
@@ -242,6 +247,7 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
 
     const newRate = data.interestRate ?? config.interestRate
     const newFee = data.upfrontFee ?? config.upfrontFee
+    const newContribution = data.contributionAmount ?? config.contributionAmount
 
     // Find the last interest entry that was actually booked (has a real transaction).
     // Initialized entries (paidAt set but no transactionId) can be safely rebuilt.
@@ -252,20 +258,15 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
     // Delete all interest entries that can be rebuilt:
     // - unpaid entries (paidAt === null)
     // - initialized entries (paidAt set but no transactionId)
+    // Delete all rebuildable entries (no real transaction attached)
     await tx.savingsEntry.deleteMany({
       where: {
         savingsConfigId: config.id,
-        entryType: 'INTEREST',
         OR: [
           { paidAt: null },
           { paidAt: { not: null }, transactionId: null },
         ],
       },
-    })
-
-    // Also delete FEE entries without transactions (can be rebuilt)
-    await tx.savingsEntry.deleteMany({
-      where: { savingsConfigId: config.id, entryType: 'FEE', transactionId: null },
     })
 
     // Determine rebuild starting point
@@ -300,7 +301,7 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
         savingsType: (config.account?.type ?? 'SPARPLAN') as 'SPARPLAN' | 'FESTGELD',
         initialBalance: effectiveStartBalance,
         upfrontFee: bookedEntries.length > 0 ? 0 : newFee,
-        contributionAmount: config.contributionAmount,
+        contributionAmount: newContribution,
         contributionFrequency: config.contributionFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY' | null,
         interestRate: newRate,
         interestFrequency: config.interestFrequency as 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY',
@@ -309,14 +310,19 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
       })
 
       // Get all non-contribution entries (FEE + INTEREST)
-      const nonContribs = newSchedule.filter(r => r.entryType !== 'CONTRIBUTION')
-      let interestCounter = lastBookedInterest?.periodNumber ?? 0
-      let feeCounter = 0
+      // Count existing booked entries per type to continue numbering
+      const bookedInterestCount = bookedEntries.filter(e => e.entryType === 'INTEREST').length
+      const bookedContribCount = bookedEntries.filter(e => e.entryType === 'CONTRIBUTION').length
+      const counters: Record<string, number> = {
+        INTEREST: bookedInterestCount,
+        CONTRIBUTION: bookedContribCount,
+        FEE: 0,
+      }
 
-      const toCreate = nonContribs.map(row => ({
+      const toCreate = newSchedule.map(row => ({
         savingsConfigId: config.id,
         entryType: row.entryType,
-        periodNumber: row.entryType === 'INTEREST' ? ++interestCounter : ++feeCounter,
+        periodNumber: ++counters[row.entryType],
         dueDate: row.dueDate,
         scheduledAmount: row.scheduledAmount,
         scheduledBalance: row.scheduledBalance,
@@ -335,7 +341,7 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
           paidAt: null,
           transactionId: null,
           dueDate: { lte: today },
-          entryType: { in: ['INTEREST', 'FEE'] },
+          entryType: { in: ['INTEREST', 'FEE', 'CONTRIBUTION'] },
         },
         data: { paidAt: new Date() },
       })

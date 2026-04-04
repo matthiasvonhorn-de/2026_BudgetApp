@@ -31,6 +31,7 @@ export const updateSavingsSchema = z.object({
   notes: z.string().nullable().optional(),
   interestRate: z.number().min(0).optional(),
   upfrontFee: z.number().min(0).optional(),
+  contributionAmount: z.number().min(0).optional(),
   initializedUntil: z.string().nullable().optional(),
 })
 

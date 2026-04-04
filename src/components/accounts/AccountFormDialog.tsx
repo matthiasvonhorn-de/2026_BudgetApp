@@ -185,6 +185,8 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
       interestRate: (savingsConfig.interestRate * 100).toFixed(2),
       interestFrequency: savingsConfig.interestFrequency ?? 'MONTHLY',
       upfrontFee: (savingsConfig.upfrontFee ?? 0).toString(),
+      contributionAmount: (savingsConfig.contributionAmount ?? 0).toString(),
+      contributionFrequency: savingsConfig.contributionFrequency ?? 'MONTHLY',
       linkedAccountId: savingsConfig.linkedAccountId ?? '',
       categoryId: savingsConfig.categoryId ?? '',
       notes: savingsConfig.notes ?? '',
@@ -204,6 +206,7 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
             accountNumber: form.iban || null,
             interestRate: parseFloat(form.interestRate.replace(',', '.')) / 100,
             upfrontFee: parseFloat(form.upfrontFee || '0'),
+            contributionAmount: parseFloat(form.contributionAmount.replace(',', '.') || '0'),
             linkedAccountId: form.linkedAccountId || null,
             categoryId: form.categoryId || null,
             notes: form.notes || null,
@@ -446,11 +449,10 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
                 {/* Sparplan-spezifisch */}
                 {isSparplan && (
                   <>
-                    {/* Sparrate (nur Create) */}
-                    {!isEdit && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <Label>Sparrate (€) *</Label>
+                    {/* Sparrate */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Sparrate (€) *</Label>
                           <Input
                             type="number" min="0" step="10"
                             value={form.contributionAmount}
@@ -474,7 +476,6 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
                           </Select>
                         </div>
                       </div>
-                    )}
 
                     {/* Verknüpftes Girokonto */}
                     <div className="space-y-1.5">
