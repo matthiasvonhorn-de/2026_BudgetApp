@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { DomainError } from '@/lib/api/errors'
+import { roundCents } from '@/lib/money'
 import { generateSavingsSchedule, addMonths } from './schedule'
 import type { z } from 'zod'
 import type { createSavingsSchema, updateSavingsSchema } from '@/lib/schemas/savings'
@@ -47,8 +48,8 @@ export async function listSavings() {
       ...cfg,
       entries: undefined,
       stats: {
-        totalInterestPaid: Math.round(totalInterest * 100) / 100,
-        totalContributionsPaid: Math.round(totalContributions * 100) / 100,
+        totalInterestPaid: roundCents(totalInterest),
+        totalContributionsPaid: roundCents(totalContributions),
         nextDueDate: nextUnpaidContrib?.dueDate ?? null,
         totalEntries: cfg.entries.length,
         paidEntries: paidEntries.length,
@@ -86,8 +87,8 @@ export async function getSavingsDetail(accountId: string) {
   return {
     ...config,
     stats: {
-      totalInterestPaid: Math.round(totalInterest * 100) / 100,
-      totalContributionsPaid: Math.round(totalContributions * 100) / 100,
+      totalInterestPaid: roundCents(totalInterest),
+      totalContributionsPaid: roundCents(totalContributions),
       nextDueDate: nextUnpaidContrib?.dueDate ?? null,
       lastScheduledDate: lastEntry?.dueDate ?? null,
       totalEntries: config.entries.length,
@@ -292,7 +293,7 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
 
       let runningBalance = balanceAfterPaid
       for (const entry of allUnpaid) {
-        runningBalance = Math.round((runningBalance + entry.scheduledAmount) * 100) / 100
+        runningBalance = roundCents(runningBalance + entry.scheduledAmount)
         if (entry.entryType === 'CONTRIBUTION' && entry.id) {
           await tx.savingsEntry.update({
             where: { id: entry.id },

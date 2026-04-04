@@ -5,11 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { arrayMove } from '@dnd-kit/sortable'
 import type { DragEndEvent } from '@dnd-kit/core'
 import { toast } from 'sonner'
-
-interface Account {
-  id: string
-  [key: string]: unknown
-}
+import type { Account } from '@/types/api'
 
 export function useAccountReorder(accounts: Account[]) {
   const qc = useQueryClient()

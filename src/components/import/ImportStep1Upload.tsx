@@ -87,6 +87,7 @@ export function ImportStep1Upload() {
           value={accountId}
           onValueChange={(v) => setAccountId(v ?? '')}
           items={(accounts as Array<{ id: string; name: string }>).map(a => ({ value: a.id, label: a.name }))}
+          itemToStringLabel={(v: string) => (accounts as Array<{ id: string; name: string }>).find(a => a.id === v)?.name ?? v}
         >
           <SelectTrigger><SelectValue placeholder="Konto wählen" /></SelectTrigger>
           <SelectContent>
@@ -103,6 +104,7 @@ export function ImportStep1Upload() {
           value={profile?.id ?? ''}
           onValueChange={id => { if (id) setProfile(BANK_PROFILES.find(p => p.id === id)!) }}
           items={BANK_PROFILES.map(p => ({ value: p.id, label: p.name }))}
+          itemToStringLabel={(v: string) => BANK_PROFILES.find(p => p.id === v)?.name ?? v}
         >
           <SelectTrigger><SelectValue placeholder="Bank wählen" /></SelectTrigger>
           <SelectContent>

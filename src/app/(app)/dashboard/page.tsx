@@ -12,16 +12,18 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
+import type { Account, Transaction, BudgetData, MonthlySummary, CategorySpending, NetWorth } from '@/types/api'
 
 const MONTHS_DE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltip({ active, payload, label }: any) {
   const fmt = useFormatCurrency()
   if (!active || !payload?.length) return null
   return (
     <div className="bg-card border rounded-lg p-3 shadow-md text-sm">
       <p className="font-medium mb-1">{label}</p>
-      {payload.map((p: any) => (
+      {payload.map((p: { dataKey: string; color: string; name: string; value: number }) => (
         <p key={p.dataKey} style={{ color: p.color }}>
           {p.name}: {fmt(p.value)}
         </p>
@@ -30,6 +32,7 @@ function CustomTooltip({ active, payload, label }: any) {
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function PieTooltip({ active, payload }: any) {
   const fmt = useFormatCurrency()
   if (!active || !payload?.length) return null
@@ -47,39 +50,39 @@ export default function DashboardPage() {
   const fmtCompact = (v: number) => new Intl.NumberFormat(locale, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(v)
   const { budgetYear, budgetMonth, goToPrevMonth, goToNextMonth } = useUIStore()
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
 
-  const { data: netWorth } = useQuery({
+  const { data: netWorth } = useQuery<NetWorth>({
     queryKey: ['net-worth', budgetYear, budgetMonth],
     queryFn: () => fetch(`/api/reports/net-worth?year=${budgetYear}&month=${budgetMonth}`).then(r => r.json()),
   })
 
-  const { data: budgetData } = useQuery({
+  const { data: budgetData } = useQuery<BudgetData>({
     queryKey: ['budget', budgetYear, budgetMonth],
     queryFn: () => fetch(`/api/budget/${budgetYear}/${budgetMonth}`).then(r => r.json()),
   })
 
-  const { data: transactions = [] } = useQuery({
+  const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ['transactions-recent'],
     queryFn: () => fetch('/api/transactions?pageSize=5').then(r => r.json().then(r => r.data)),
   })
 
-  const { data: monthlySummary = [] } = useQuery({
+  const { data: monthlySummary = [] } = useQuery<MonthlySummary[]>({
     queryKey: ['reports-monthly-summary-6'],
     queryFn: () => fetch('/api/reports/monthly-summary?months=6').then(r => r.json()),
   })
 
-  const { data: categorySpending = [] } = useQuery({
+  const { data: categorySpending = [] } = useQuery<CategorySpending[]>({
     queryKey: ['reports-category-spending', budgetYear, budgetMonth],
     queryFn: () => fetch(`/api/reports/category-spending?year=${budgetYear}&month=${budgetMonth}`).then(r => r.json()),
   })
 
   const summary = budgetData?.summary
 
-  const chartData = monthlySummary.map((d: any) => ({
+  const chartData = monthlySummary.map(d => ({
     name: MONTHS_DE[d.month - 1],
     Einnahmen: d.income,
     Ausgaben: d.expenses,
@@ -205,7 +208,7 @@ export default function DashboardPage() {
                       innerRadius={35}
                       paddingAngle={2}
                     >
-                      {topCategories.map((entry: any) => (
+                      {topCategories.map((entry) => (
                         <Cell key={entry.categoryId} fill={entry.color} />
                       ))}
                     </Pie>
@@ -237,7 +240,7 @@ export default function DashboardPage() {
           <CardContent className="space-y-2">
             {accounts.length === 0 ? (
               <p className="text-sm text-muted-foreground">Keine Konten angelegt</p>
-            ) : accounts.map((a: any) => (
+            ) : accounts.map((a) => (
               <div key={a.id} className="flex items-center justify-between py-1">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: a.color }} />
@@ -258,7 +261,7 @@ export default function DashboardPage() {
           <CardContent className="space-y-2">
             {transactions.length === 0 ? (
               <p className="text-sm text-muted-foreground">Keine Transaktionen</p>
-            ) : transactions.map((t: any) => (
+            ) : transactions.map((t) => (
               <div key={t.id} className="flex items-center justify-between py-1">
                 <div>
                   <p className="text-sm font-medium">{t.description}</p>

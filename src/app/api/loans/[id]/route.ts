@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { calcAnnuityFromRates, generateSchedule } from '@/lib/loans/amortization'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
+import { roundCents } from '@/lib/money'
 
 const UpdateSchema = z.object({
   // Metadaten — änderbar ohne Plan-Neuberechnung
@@ -22,8 +23,7 @@ const UpdateSchema = z.object({
 })
 
 // Schneidet paidUntil auf das nächst kleinere vorhandene Payment-Datum
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function resolveEffectivePaidUntil(tx: any, loanId: string, paidUntil: string | null): Promise<Date | null> {
+async function resolveEffectivePaidUntil(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], loanId: string, paidUntil: string | null): Promise<Date | null> {
   if (!paidUntil) return null
   const cutoff = new Date(paidUntil)
   const latest = await tx.loanPayment.findFirst({
@@ -53,8 +53,8 @@ export const GET = withHandler(async (_, ctx) => {
     ...loan,
     paidUntil: loan.paidUntil ? loan.paidUntil.toISOString().slice(0, 10) : null,
     stats: {
-      totalInterestPaid: Math.round(totalInterestPaid * 100) / 100,
-      totalPrincipalPaid: Math.round(totalPrincipalPaid * 100) / 100,
+      totalInterestPaid: roundCents(totalInterestPaid),
+      totalPrincipalPaid: roundCents(totalPrincipalPaid),
       remainingBalance: loan.payments.at(-1)?.scheduledBalance ?? 0,
       periodsPaid: paidRows.length,
       totalPeriods: loan.payments.length,
@@ -168,7 +168,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
         initialRepaymentRate: repaymentRate,
         termMonths,
         startDate,
-        monthlyPayment: Math.round(monthlyPayment * 100) / 100,
+        monthlyPayment: roundCents(monthlyPayment),
       },
     })
 

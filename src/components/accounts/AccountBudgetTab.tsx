@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AccountBudgetConfig } from '@/components/accounts/AccountBudgetConfig'
+import type { Transaction, Account } from '@/types/api'
 
 // ── Typen ────────────────────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ function CategoryActivityDialog({
   const from = `${year}-${String(month).padStart(2, '0')}-01`
   const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
-  const { data: transactions = [], isLoading } = useQuery<any[]>({
+  const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
     queryKey: ['transactions-detail', accountId, cat?.id, year, month],
     queryFn: () =>
       fetch(`/api/transactions?accountId=${accountId}&categoryId=${cat!.id}&from=${from}&to=${to}`)
@@ -113,7 +114,7 @@ function CategoryActivityDialog({
                   </tr>
                 </thead>
                 <tbody>
-                  {transactions.map((t: any) => (
+                  {transactions.map((t: Transaction) => (
                     <tr key={t.id} className="border-t hover:bg-muted/50">
                       <td className="p-3 text-muted-foreground whitespace-nowrap">{formatDate(t.date)}</td>
                       <td className="p-3">
@@ -150,7 +151,7 @@ function BookTransactionDialog({
 }: {
   state: BookDialogState
   onClose: () => void
-  accounts: any[]
+  accounts: Account[]
   accountId: string
   budgetYear: number
   budgetMonth: number
@@ -228,13 +229,14 @@ function BookTransactionDialog({
             <Select
               value={selAccountId}
               onValueChange={(v: string | null) => v && setSelAccountId(v)}
-              items={accounts.map((a: any) => ({ value: a.id, label: a.name }))}
+              items={accounts.map((a: Account) => ({ value: a.id, label: a.name }))}
+              itemToStringLabel={(v: string) => accounts.find((a: Account) => a.id === v)?.name ?? v}
             >
               <SelectTrigger>
                 <SelectValue placeholder="—" />
               </SelectTrigger>
               <SelectContent>
-                {accounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                {accounts.map((a: Account) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -318,7 +320,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
       fetch(`/api/accounts/${accountId}/budget/${budgetYear}/${budgetMonth}`).then(r => r.json()),
   })
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })

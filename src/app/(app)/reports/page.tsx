@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useSettingsStore } from '@/store/useSettingsStore'
+import type { MonthlySummary, CategorySpending, BudgetData, BudgetGroup } from '@/types/api'
 
 const MONTHS_DE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
@@ -46,12 +47,14 @@ function MonthYearSelector({
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltipBar({ active, payload, label }: any) {
   const fmt = useFormatCurrency()
   if (!active || !payload?.length) return null
   return (
     <div className="bg-card border rounded-lg p-3 shadow-md text-sm">
       <p className="font-medium mb-1">{label}</p>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {payload.map((p: any) => (
         <p key={p.dataKey} style={{ color: p.color }}>
           {p.name}: {fmt(p.value)}
@@ -61,6 +64,7 @@ function CustomTooltipBar({ active, payload, label }: any) {
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTooltipPie({ active, payload }: any) {
   const fmt = useFormatCurrency()
   if (!active || !payload?.length) return null
@@ -80,22 +84,22 @@ export default function ReportsPage() {
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
 
-  const { data: monthlySummary = [] } = useQuery({
+  const { data: monthlySummary = [] } = useQuery<MonthlySummary[]>({
     queryKey: ['reports-monthly-summary'],
     queryFn: () => fetch('/api/reports/monthly-summary?months=12').then(r => r.json()),
   })
 
-  const { data: categorySpending = [] } = useQuery({
+  const { data: categorySpending = [] } = useQuery<CategorySpending[]>({
     queryKey: ['reports-category-spending', selectedYear, selectedMonth],
     queryFn: () => fetch(`/api/reports/category-spending?year=${selectedYear}&month=${selectedMonth}`).then(r => r.json()),
   })
 
-  const { data: budgetData } = useQuery({
+  const { data: budgetData } = useQuery<BudgetData>({
     queryKey: ['budget', selectedYear, selectedMonth],
     queryFn: () => fetch(`/api/budget/${selectedYear}/${selectedMonth}`).then(r => r.json()),
   })
 
-  const chartData = monthlySummary.map((d: any) => ({
+  const chartData = monthlySummary.map((d: MonthlySummary) => ({
     name: `${MONTHS_DE[d.month - 1]} ${d.year !== now.getFullYear() ? d.year : ''}`.trim(),
     Einnahmen: d.income,
     Ausgaben: d.expenses,
@@ -103,18 +107,18 @@ export default function ReportsPage() {
   }))
 
   // Budget vs. Ist data
-  const budgetVsActual = budgetData?.groups?.flatMap((g: any) =>
+  const budgetVsActual = budgetData?.groups?.flatMap((g: BudgetGroup) =>
     g.categories
-      .filter((c: any) => c.type === 'EXPENSE' && (c.budgeted > 0 || Math.abs(c.activity) > 0))
-      .map((c: any) => ({
+      .filter((c) => c.type === 'EXPENSE' && (c.budgeted > 0 || Math.abs(c.activity) > 0))
+      .map((c) => ({
         name: c.name,
         Budget: c.budgeted,
         Ist: Math.abs(c.activity),
       }))
   ) ?? []
 
-  const totalIncome = monthlySummary.reduce((s: number, d: any) => s + d.income, 0) / (monthlySummary.length || 1)
-  const totalExpenses = monthlySummary.reduce((s: number, d: any) => s + d.expenses, 0) / (monthlySummary.length || 1)
+  const totalIncome = monthlySummary.reduce((s: number, d: MonthlySummary) => s + d.income, 0) / (monthlySummary.length || 1)
+  const totalExpenses = monthlySummary.reduce((s: number, d: MonthlySummary) => s + d.expenses, 0) / (monthlySummary.length || 1)
 
   return (
     <div className="p-6">
@@ -234,7 +238,7 @@ export default function ReportsPage() {
                         innerRadius={50}
                         paddingAngle={2}
                       >
-                        {categorySpending.map((entry: any) => (
+                        {categorySpending.map((entry: CategorySpending) => (
                           <Cell key={entry.categoryId} fill={entry.color} />
                         ))}
                       </Pie>
@@ -250,8 +254,8 @@ export default function ReportsPage() {
                   <CardTitle className="text-base">Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {categorySpending.map((cat: any) => {
-                    const total = categorySpending.reduce((s: number, c: any) => s + c.amount, 0)
+                  {categorySpending.map((cat: CategorySpending) => {
+                    const total = categorySpending.reduce((s: number, c: CategorySpending) => s + c.amount, 0)
                     const pct = total > 0 ? (cat.amount / total) * 100 : 0
                     return (
                       <div key={cat.categoryId}>
@@ -273,7 +277,7 @@ export default function ReportsPage() {
                   })}
                   <div className="border-t pt-2 flex justify-between text-sm font-semibold">
                     <span>Gesamt</span>
-                    <span>{fmt(categorySpending.reduce((s: number, c: any) => s + c.amount, 0))}</span>
+                    <span>{fmt(categorySpending.reduce((s: number, c: CategorySpending) => s + c.amount, 0))}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -334,7 +338,7 @@ export default function ReportsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {budgetVsActual.map((row: any) => {
+                      {budgetVsActual.map((row: { name: string; Budget: number; Ist: number }) => {
                         const diff = row.Budget - row.Ist
                         return (
                           <tr key={row.name} className="border-b">

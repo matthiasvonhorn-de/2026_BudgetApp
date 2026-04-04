@@ -1,3 +1,5 @@
+import { roundCents } from '@/lib/money'
+
 export interface LoanParams {
   loanType: 'ANNUITAETENDARLEHEN' | 'RATENKREDIT'
   principal: number
@@ -80,6 +82,4 @@ export function generateSchedule(
   return rows
 }
 
-function round2(v: number): number {
-  return Math.round(v * 100) / 100
-}
+const round2 = roundCents

@@ -14,6 +14,7 @@ import { formatDate } from '@/lib/utils'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { CheckCircle2 } from 'lucide-react'
+import type { Transaction } from '@/types/api'
 
 interface Props {
   accountId: string
@@ -29,17 +30,17 @@ export function ReconcileDialog({ accountId, accountName, open, onOpenChange }: 
   const [statementBalance, setStatementBalance] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  const { data: transactions = [] } = useQuery({
+  const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ['transactions-reconcile', accountId],
     queryFn: () => fetch(`/api/transactions?accountId=${accountId}`).then(r => r.json().then(r => r.data)),
     enabled: open,
   })
 
-  const pendingTransactions = transactions.filter((t: any) => t.status !== 'RECONCILED')
+  const pendingTransactions = transactions.filter((t: Transaction) => t.status !== 'RECONCILED')
 
   const clearedSum = pendingTransactions
-    .filter((t: any) => selectedIds.has(t.id))
-    .reduce((sum: number, t: any) => sum + t.amount, 0)
+    .filter((t: Transaction) => selectedIds.has(t.id))
+    .reduce((sum: number, t: Transaction) => sum + t.amount, 0)
 
   const target = parseFloat(statementBalance.replace(',', '.')) || 0
   const difference = target - clearedSum
@@ -48,7 +49,7 @@ export function ReconcileDialog({ accountId, accountName, open, onOpenChange }: 
     if (selectedIds.size === pendingTransactions.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(pendingTransactions.map((t: any) => t.id)))
+      setSelectedIds(new Set(pendingTransactions.map((t: Transaction) => t.id)))
     }
   }
 
@@ -138,7 +139,7 @@ export function ReconcileDialog({ accountId, accountName, open, onOpenChange }: 
             <tbody>
               {pendingTransactions.length === 0 ? (
                 <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Keine ausstehenden Transaktionen</td></tr>
-              ) : pendingTransactions.map((t: any) => (
+              ) : pendingTransactions.map((t: Transaction) => (
                 <tr
                   key={t.id}
                   className={`border-t cursor-pointer ${selectedIds.has(t.id) ? 'bg-blue-50' : 'hover:bg-muted/50'}`}

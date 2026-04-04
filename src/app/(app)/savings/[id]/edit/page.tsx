@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import type { Account, SavingsEntry } from '@/types/api'
 
 interface EditForm {
   name: string
@@ -57,7 +58,7 @@ export default function SavingsEditPage() {
     enabled: !!data,
   })
 
-  const giroAccounts = accounts.filter((a: any) =>
+  const giroAccounts = accounts.filter((a: Account) =>
     !['SPARPLAN', 'FESTGELD'].includes(a.type) && a.isActive
   )
 
@@ -105,7 +106,7 @@ export default function SavingsEditPage() {
   const isSparplan = data.account.type === 'SPARPLAN'
   const today = new Date().toISOString().slice(0, 10)
   const hasUnpaidPastEntries = (data.entries ?? []).some(
-    (e: any) => e.paidAt === null && e.dueDate.slice(0, 10) <= today
+    (e: SavingsEntry) => e.paidAt === null && e.dueDate.slice(0, 10) <= today
   )
   const originalRate = (data.interestRate * 100).toFixed(2)
   const rateChanged = form.interestRate !== originalRate
@@ -169,11 +170,15 @@ export default function SavingsEditPage() {
               <Select
                 value={form.linkedAccountId}
                 onValueChange={(v: string | null) => { set('linkedAccountId', v ?? ''); set('categoryId', '') }}
+                itemToStringLabel={(v: string) => {
+                  if (!v) return 'Kein Konto'
+                  return giroAccounts.find((a: Account) => a.id === v)?.name ?? v
+                }}
               >
                 <SelectTrigger><SelectValue placeholder="Kein Konto (optional)" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Kein Konto</SelectItem>
-                  {giroAccounts.map((a: any) => (
+                  {giroAccounts.map((a: Account) => (
                     <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -189,6 +194,14 @@ export default function SavingsEditPage() {
                 <Select
                   value={form.categoryId}
                   onValueChange={(v: string | null) => set('categoryId', v ?? '')}
+                  itemToStringLabel={(v: string) => {
+                    if (!v) return 'Keine Kategorie'
+                    for (const g of categoryGroups) {
+                      const cat = g.categories.find(c => c.id === v)
+                      if (cat) return cat.name
+                    }
+                    return v
+                  }}
                 >
                   <SelectTrigger><SelectValue placeholder="Keine Kategorie (optional)" /></SelectTrigger>
                   <SelectContent>

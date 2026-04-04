@@ -365,7 +365,18 @@ export default function LoanDetailPage() {
             Welche Kategorie soll für Kreditraten-Buchungen bei <strong>{loan?.name}</strong> verwendet werden?
             Diese Einstellung wird dauerhaft gespeichert.
           </p>
-          <Select value={selectedCategoryId} onValueChange={(v) => v !== null && setSelectedCategoryId(v)}>
+          <Select
+            value={selectedCategoryId}
+            onValueChange={(v) => v !== null && setSelectedCategoryId(v)}
+            itemToStringLabel={(v: string) => {
+              if (!v) return 'Keine Kategorie'
+              for (const group of (categoryData?.groups ?? [])) {
+                const cat = group.categories.find(c => c.id === v)
+                if (cat) return cat.name
+              }
+              return v
+            }}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Kategorie wählen (optional)" />
             </SelectTrigger>

@@ -36,6 +36,7 @@ export default function CategoriesSettingsPage() {
           value={accountId ?? ''}
           onValueChange={v => setSelectedAccountId(v)}
           items={accounts.map(a => ({ value: a.id, label: a.name }))}
+          itemToStringLabel={(v: string) => accounts.find(a => a.id === v)?.name ?? v}
         >
           <SelectTrigger className="w-64">
             <SelectValue placeholder="Konto wählen…" />

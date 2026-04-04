@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { calcAnnuityFromRates } from '@/lib/loans/amortization'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import type { Account, Loan } from '@/types/api'
 
 interface LoanForm {
   name: string
@@ -49,7 +50,7 @@ function LoanDialog({
 }: {
   open: boolean
   onClose: () => void
-  loan?: any
+  loan?: Loan
 }) {
   const qc = useQueryClient()
   const { currency } = useSettingsStore()
@@ -86,7 +87,7 @@ function LoanDialog({
       if (loan) {
         setForm({
           name: loan.name,
-          loanType: loan.loanType,
+          loanType: loan.loanType as 'ANNUITAETENDARLEHEN' | 'RATENKREDIT',
           principal: loan.principal.toString(),
           interestRate: (loan.interestRate * 100).toFixed(3),
           initialRepaymentRate: loan.initialRepaymentRate != null ? (loan.initialRepaymentRate * 100).toFixed(3) : '',
@@ -297,14 +298,14 @@ function LoanDialog({
               <Select
                 value={form.accountId}
                 onValueChange={(v: string | null) => { set('accountId', v ?? ''); set('categoryId', '') }}
-                items={accounts.map((a: any) => ({ value: a.id, label: a.name }))}
+                items={accounts.map((a: Account) => ({ value: a.id, label: a.name }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Kein Konto" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Kein Konto</SelectItem>
-                  {accounts.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  {accounts.map((a: Account) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -370,11 +371,11 @@ export default function LoansSettingsPage() {
   const qc = useQueryClient()
   const fmt = useFormatCurrency()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editLoan, setEditLoan] = useState<any>(null)
+  const [editLoan, setEditLoan] = useState<Loan | undefined>(undefined)
 
-  const openEdit = (loan: any) => { setEditLoan(loan); setDialogOpen(true) }
-  const openCreate = () => { setEditLoan(null); setDialogOpen(true) }
-  const closeDialog = () => { setDialogOpen(false); setEditLoan(null) }
+  const openEdit = (loan: Loan) => { setEditLoan(loan); setDialogOpen(true) }
+  const openCreate = () => { setEditLoan(undefined); setDialogOpen(true) }
+  const closeDialog = () => { setDialogOpen(false); setEditLoan(undefined) }
 
   const { data: loans = [], isLoading } = useQuery({
     queryKey: ['loans'],
@@ -431,7 +432,7 @@ export default function LoansSettingsPage() {
               </tr>
             </thead>
             <tbody>
-              {loans.map((loan: any) => (
+              {loans.map((loan: Loan) => (
                 <tr key={loan.id} className="border-t hover:bg-muted/30">
                   <td className="p-3 font-medium">{loan.name}</td>
                   <td className="p-3 text-muted-foreground text-xs">{TYPE_LABELS[loan.loanType]}</td>
