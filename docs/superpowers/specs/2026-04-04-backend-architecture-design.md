@@ -6,7 +6,7 @@
 
 **Architecture:** Five PRs applied in order. Each PR leaves the codebase in a better state than before and does not break existing functionality. No service layer is introduced for domains other than Savings.
 
-**Tech Stack:** Next.js 15 App Router, TypeScript, Prisma v7 + libSQL, Zod v4, shadcn/ui, TanStack Query
+**Tech Stack:** Next.js 16 (App Router), TypeScript, Prisma v7 + libSQL, Zod v4, shadcn/ui, TanStack Query, Electron 41
 
 ---
 
@@ -33,7 +33,7 @@ The following are **out of scope** (YAGNI):
 
 ### Problem
 
-Every route file contains its own `try/catch` that always returns HTTP 500, regardless of the error type. ZodError and domain errors are indistinguishable from unexpected crashes.
+Every route file contains its own `try/catch` that always returns HTTP 500, regardless of the error type. ZodError and domain errors are indistinguishable from unexpected crashes. Some routes already return 400 for validation errors via manual checks — after migration these are handled uniformly by `withHandler`.
 
 ### Design
 
@@ -55,7 +55,9 @@ import { ZodError } from 'zod'
 import { NextResponse } from 'next/server'
 import { DomainError } from './errors'
 
-type RouteHandler = (req: Request, ctx: any) => Promise<NextResponse>
+// ctx typed as unknown — Next.js App Router passes { params: Promise<...> } which
+// each handler resolves itself. Using unknown here avoids any without lying about the type.
+type RouteHandler = (req: Request, ctx: unknown) => Promise<NextResponse>
 
 export function withHandler(fn: RouteHandler): RouteHandler {
   return async (req, ctx) => {
@@ -77,7 +79,7 @@ export function withHandler(fn: RouteHandler): RouteHandler {
 
 - All `export async function GET/POST/PUT/DELETE` handlers in `src/app/api/**` are wrapped with `withHandler`.
 - The `try/catch` inside each handler is removed; errors are thrown instead of caught locally.
-- ZodError is thrown by calling `Schema.parse(body)` (not `safeParse`).
+- Validation uses `Schema.parse(body)` (not `safeParse`) — ZodError propagates to `withHandler` automatically.
 - Existing `if (!config) return NextResponse.json({ error: 'Not found' }, { status: 404 })` patterns are replaced with `throw new DomainError('Not found', 404)`.
 
 ### Files affected
@@ -116,7 +118,7 @@ export type SavingsCreateInput = z.infer<typeof SavingsCreateSchema>
 
 - Inline `z.object(...)` definitions in the three affected route families are replaced with imports from `src/lib/schemas/`.
 - `SavingsCreatePayload` in `tests/savings/helpers.ts` is replaced with `SavingsCreateInput` from `src/lib/schemas/savings.ts`.
-- `SavingsForm` interface in `SavingsFormDialog.tsx` remains a UI-local type (it represents string-typed form state, not API payload).
+- `SavingsForm` interface in `SavingsFormDialog.tsx` remains a UI-local type (it represents string-typed form state, not API payload — the distinction is intentional and correct).
 
 ### Scope constraint
 
@@ -128,7 +130,7 @@ Only Savings, Transactions, and Accounts schemas are extracted. All other route 
 
 ### Problem
 
-`src/app/api/savings/route.ts` and `src/app/api/savings/[id]/route.ts` together contain ~450 lines mixing HTTP concerns, business logic, and database access. The lazy-extend logic in GET also violates command-query separation.
+`src/app/api/savings/route.ts` and `src/app/api/savings/[id]/route.ts` together contain ~450 lines mixing HTTP concerns, business logic, and database access.
 
 ### Design
 
@@ -138,7 +140,7 @@ Public interface:
 
 ```ts
 createSavings(input: SavingsCreateInput): Promise<{ account: Account; config: SavingsConfig }>
-getSavings(accountId: string): Promise<SavingsData>
+getSavings(accountId: string): Promise<SavingsData>        // includes lazy-extend until Step 4
 listSavings(): Promise<SavingsListItem[]>
 updateSavings(accountId: string, input: SavingsUpdateInput): Promise<void>
 deleteSavings(accountId: string): Promise<void>
@@ -146,6 +148,8 @@ payEntries(accountId: string, paidUntil: string): Promise<{ paid: number }>
 unpayEntry(accountId: string, entryId: string): Promise<void>
 extendSchedule(accountId: string): Promise<{ extended: boolean; added: number }>
 ```
+
+**Important:** `getSavings()` in Step 3 still contains the lazy-extend logic migrated from the current GET handler. CQRS (read-only GET) is completed in Step 4, not here. This is intentional — Step 3 is a pure structural move, not a behaviour change.
 
 ### Rules
 
@@ -158,14 +162,14 @@ extendSchedule(accountId: string): Promise<{ extended: boolean; added: number }>
 
 ```ts
 // src/app/api/savings/[id]/route.ts
-export const GET = withHandler(async (_, { params }) => {
-  const { id } = await params
+export const GET = withHandler(async (_, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params
   const data = await savingsService.getSavings(id)
   return NextResponse.json(data)
 })
 
-export const PUT = withHandler(async (req, { params }) => {
-  const { id } = await params
+export const PUT = withHandler(async (req, ctx) => {
+  const { id } = await (ctx as { params: Promise<{ id: string }> }).params
   const input = SavingsUpdateSchema.parse(await req.json())
   await savingsService.updateSavings(id, input)
   return NextResponse.json({ success: true })
@@ -182,23 +186,29 @@ export const PUT = withHandler(async (req, { params }) => {
 
 ### Design
 
-**`GET /api/savings/[id]`** — pure read, delegates to `savingsService.getSavings()`. No writes.
+**`GET /api/savings/[id]`** — pure read, delegates to `savingsService.getSavings()`. Lazy-extend logic is removed from `getSavings()`.
 
-**`POST /api/savings/[id]/extend`** — the server decides whether extension is needed:
+**`POST /api/savings/[id]/extend`** — the server decides whether extension is needed. The existing endpoint at this path is updated to use the service:
 
 ```ts
-// savingsService.extendSchedule(accountId)
+// savingsService.extendSchedule(accountId) — full logic:
 if (config.termMonths !== null) return { extended: false, added: 0 }
 const horizon = addMonths(new Date(), 24)
 if (lastEntry && lastEntry.dueDate >= horizon) return { extended: false, added: 0 }
-// generate new rows …
-await prisma.savingsEntry.createMany({ data: newRows, skipDuplicates: true })
-return { extended: true, added: newRows.length }
+
+// Replicates existing extend semantics exactly:
+// - extendFrom = addMonths(lastEntry.dueDate, interestPeriodMonths)
+// - monthsNeeded = ceil((horizon - extendFrom) / 30.44d) + interestPeriodMonths
+// - periodNumber offset: continues from max existing INTEREST / CONTRIBUTION period numbers
+const result = await prisma.savingsEntry.createMany({ data: newRows, skipDuplicates: true })
+return { extended: result.count > 0, added: result.count }
+// Note: result.count reflects actually inserted rows, not newRows.length,
+// which may differ when skipDuplicates skips existing entries.
 ```
 
-The client (savings detail page) fires `POST /extend` once after the initial GET response. The server decides whether any rows need to be added. Double-calls (React Strict Mode, fast navigation) are safe due to `skipDuplicates: true` and the horizon check.
+**Idempotency**: `skipDuplicates: true` handles concurrent/duplicate calls. The horizon check provides an early exit so no rows are generated unnecessarily.
 
-**UI change**: In `src/app/(app)/savings/[id]/page.tsx`, after the `useQuery` for savings data resolves, a one-shot `useMutation` posts to `/extend`. The result is not shown to the user; it only triggers a query invalidation if `extended: true`.
+**UI change**: In `src/app/(app)/savings/[id]/page.tsx`, after the `useQuery` for savings data resolves, a one-shot `useMutation` posts to `/extend`. The result is not shown to the user; it triggers a query invalidation only if `extended: true`.
 
 ---
 
@@ -213,10 +223,10 @@ The client (savings detail page) fires `POST /extend` once after the initial GET
 Replace `README.md` with a project-specific document covering:
 
 1. **Overview** — what the app is, who uses it, key features
-2. **Stack** — Next.js 15, Prisma v7 + libSQL, TanStack Query, shadcn/ui, Playwright — one line per technology explaining the why
+2. **Stack** — Next.js 16, Electron 41, Prisma v7 + libSQL, TanStack Query, shadcn/ui, Playwright — one line per technology explaining the why
 3. **Architecture** — request flow (Route → Service → Prisma), error handling (withHandler + DomainError), schema sharing
-4. **Operations** — `npm run dev`, manual DB migrations (`sqlite3` + `prisma generate`), running Playwright tests
-5. **Conventions** — branch naming, commit style, PR workflow (distilled from CLAUDE.md)
+4. **Operations** — `npm run dev`, `npm run electron:dev`, manual DB migrations (`sqlite3` + `prisma generate`), running Playwright tests
+5. **Conventions** — branch naming (`feature/`, `fix/`, `chore/`), commit style, PR workflow (distilled from CLAUDE.md)
 
 `CLAUDE.md` is left unchanged (Claude-specific guidance, not general project docs).
 
@@ -226,10 +236,10 @@ Replace `README.md` with a project-specific document covering:
 
 | PR | Branch | Content |
 |----|--------|---------|
-| 1 | `refactor/api-error-handler` | `withHandler` + `DomainError` + migrate all routes |
-| 2 | `refactor/shared-schemas` | `src/lib/schemas/` + update routes + test helpers |
-| 3 | `refactor/savings-service` | `savingsService.ts` + slim routes |
-| 4 | `refactor/savings-extend-idempotent` | Read-only GET + idempotent POST /extend + UI change |
+| 1 | `chore/api-error-handler` | `withHandler` + `DomainError` + migrate all routes |
+| 2 | `chore/shared-schemas` | `src/lib/schemas/` + update routes + test helpers |
+| 3 | `chore/savings-service` | `savingsService.ts` + slim routes (lazy-extend stays) |
+| 4 | `chore/savings-extend-idempotent` | Read-only GET + idempotent POST /extend + UI change |
 | 5 | `docs/readme` | Replace README.md |
 
 Each PR is based on the previous merged branch. No PR depends on a later one.
