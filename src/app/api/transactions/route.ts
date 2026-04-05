@@ -38,6 +38,11 @@ export const GET = withHandler(async (request: Request) => {
       include: {
         account: { select: { id: true, name: true, color: true } },
         category: { select: { id: true, name: true, color: true, type: true } },
+        subAccountEntry: {
+          select: {
+            group: { select: { id: true, name: true, subAccount: { select: { id: true, name: true } } } },
+          },
+        },
       },
       orderBy: { date: 'desc' },
       ...(pageSize > 0 && { skip: (page - 1) * pageSize, take: pageSize }),

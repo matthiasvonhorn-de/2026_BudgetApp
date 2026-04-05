@@ -236,6 +236,10 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     setSelectedGroupId('')
   }
 
+  // Erkennung: Ist das eine Sub-Account-TX (nur Unterkonto, kein Hauptkonto)?
+  const isSubOnlyTx = editTransaction?.subAccountEntry != null && editTransaction?.mainAmount == null
+  const subGroupInfo = editTransaction?.subAccountEntry?.group
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
@@ -245,26 +249,33 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
         <Form {...form}>
           <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
 
-            {/* Typ */}
-            <FormField control={form.control} name="mainType" render={({ field }) => (
+            {/* Typ — read-only bei Sub-Only-TX */}
+            {isSubOnlyTx ? (
               <FormItem>
                 <FormLabel>Typ</FormLabel>
-                <Select
-                  onValueChange={(v) => v && handleTypeChange(v)}
-                  value={field.value}
-                  itemToStringLabel={(v: string) => ({ EXPENSE: 'Ausgabe', INCOME: 'Einnahme', TRANSFER: 'Umbuchung' }[v] ?? v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Typ wählen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EXPENSE">Ausgabe</SelectItem>
-                    <SelectItem value="INCOME">Einnahme</SelectItem>
-                    <SelectItem value="TRANSFER">Umbuchung</SelectItem>
-                  </SelectContent>
-                </Select>
+                <p className="text-sm text-muted-foreground">Unterkonto-Buchung</p>
               </FormItem>
-            )} />
+            ) : (
+              <FormField control={form.control} name="mainType" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Typ</FormLabel>
+                  <Select
+                    onValueChange={(v) => v && handleTypeChange(v)}
+                    value={field.value}
+                    itemToStringLabel={(v: string) => ({ EXPENSE: 'Ausgabe', INCOME: 'Einnahme', TRANSFER: 'Umbuchung' }[v] ?? v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Typ wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EXPENSE">Ausgabe</SelectItem>
+                      <SelectItem value="INCOME">Einnahme</SelectItem>
+                      <SelectItem value="TRANSFER">Umbuchung</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
+            )}
 
             {/* Datum */}
             <FormField control={form.control} name="date" render={({ field }) => (
@@ -303,7 +314,27 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
               </FormItem>
             )} />
 
-            {currentType === 'TRANSFER' ? (
+            {isSubOnlyTx ? (
+              <>
+                {/* Sub-Only-TX: Konto und Unterkonto-Gruppe als Info */}
+                <FormItem>
+                  <FormLabel>Konto</FormLabel>
+                  <p className="text-sm">{editTransaction?.account?.name ?? '—'}</p>
+                </FormItem>
+                {subGroupInfo && (
+                  <>
+                    <FormItem>
+                      <FormLabel>Unterkonto</FormLabel>
+                      <p className="text-sm">{subGroupInfo.subAccount.name}</p>
+                    </FormItem>
+                    <FormItem>
+                      <FormLabel>Gruppe</FormLabel>
+                      <p className="text-sm">{subGroupInfo.name}</p>
+                    </FormItem>
+                  </>
+                )}
+              </>
+            ) : currentType === 'TRANSFER' ? (
               <>
                 {/* Von Konto */}
                 <FormField control={form.control} name="accountId" render={({ field }) => (

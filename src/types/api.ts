@@ -85,6 +85,13 @@ export interface Transaction {
   account?: AccountRef
   category?: CategoryRef | null
   loanPayment?: LoanPaymentRef | null
+  subAccountEntry?: {
+    group: {
+      id: string
+      name: string
+      subAccount: { id: string; name: string }
+    }
+  } | null
 }
 
 export interface TransactionPage {
