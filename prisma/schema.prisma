@@ -345,6 +345,33 @@ model SavingsEntry {
   @@index([savingsConfigId])
 }
 
+model Portfolio {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#6366f1")
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  values PortfolioValue[]
+}
+
+model PortfolioValue {
+  id          String   @id @default(cuid())
+  portfolioId String
+  date        DateTime
+  value       Float
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, date])
+  @@index([portfolioId])
+}
+
 model AppSetting {
   key       String   @id
   value     String
