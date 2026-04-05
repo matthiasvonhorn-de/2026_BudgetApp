@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { format } from 'date-fns'
 import { useSettingsStore } from '@/store/useSettingsStore'
-import type { Account } from '@/types/api'
+import type { Account, Transaction } from '@/types/api'
 
 const schema = z.object({
   date: z.string().min(1),
@@ -58,9 +58,10 @@ interface Props {
   onOpenChange: (open: boolean) => void
   defaultAccountId?: string
   hideAccountSelector?: boolean
+  editTransaction?: Transaction | null
 }
 
-export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hideAccountSelector }: Props) {
+export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hideAccountSelector, editTransaction }: Props) {
   const queryClient = useQueryClient()
   const { currency } = useSettingsStore()
   const [transferTargetId, setTransferTargetId] = useState('')
@@ -102,12 +103,24 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     enabled: !!watchedAccountId && currentType !== 'TRANSFER',
   })
 
-  // Wenn Dialog öffnet: Standard-Konto vorbelegen
+  // Wenn Dialog öffnet: Transaktion vorbelegen (Edit) oder Standard-Konto setzen (Create)
   useEffect(() => {
-    if (open && defaultAccountId) {
+    if (!open) return
+    if (editTransaction) {
+      form.reset({
+        date: format(new Date(editTransaction.date), 'yyyy-MM-dd'),
+        amount: Math.abs(editTransaction.amount),
+        description: editTransaction.description,
+        payee: editTransaction.payee ?? '',
+        accountId: editTransaction.accountId,
+        categoryId: editTransaction.categoryId ?? '',
+        type: editTransaction.type,
+        notes: editTransaction.notes ?? '',
+      })
+    } else if (defaultAccountId) {
       form.setValue('accountId', defaultAccountId)
     }
-  }, [open, defaultAccountId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, editTransaction, defaultAccountId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wenn Konto wechselt: Gruppe und Kategorie zurücksetzen
   useEffect(() => {
@@ -139,7 +152,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     form.setValue('categoryId', '')
   }
 
-  const mutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: async (values: FormValues) => {
       const amount = values.type === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
       const res = await fetch('/api/transactions', {
@@ -158,21 +171,57 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
       toast.success('Transaktion erstellt')
-      onOpenChange(false)
-      form.reset({ date: format(new Date(), 'yyyy-MM-dd'), type: 'EXPENSE', amount: 0 })
-      setTransferTargetId('')
-      setTransferGroupId('')
-      setSelectedGroupId('')
+      handleClose()
     },
     onError: () => toast.error('Fehler beim Speichern'),
   })
+
+  const updateMutation = useMutation({
+    mutationFn: async (values: FormValues) => {
+      const amount = values.type === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
+      const res = await fetch(`/api/transactions/${editTransaction!.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: values.date,
+          amount,
+          description: values.description,
+          payee: values.payee || null,
+          notes: values.notes || null,
+          categoryId: values.categoryId || null,
+          status: editTransaction!.status,
+        }),
+      })
+      if (!res.ok) throw new Error('Fehler')
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
+      toast.success('Transaktion aktualisiert')
+      handleClose()
+    },
+    onError: () => toast.error('Fehler beim Speichern'),
+  })
+
+  const mutation = editTransaction ? updateMutation : createMutation
+
+  function handleClose() {
+    onOpenChange(false)
+    form.reset({ date: format(new Date(), 'yyyy-MM-dd'), type: 'EXPENSE', amount: 0 })
+    setTransferTargetId('')
+    setTransferGroupId('')
+    setSelectedGroupId('')
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Neue Transaktion</DialogTitle>
+          <DialogTitle>{editTransaction ? 'Transaktion bearbeiten' : 'Neue Transaktion'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
@@ -409,7 +458,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
             )}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+              <Button type="button" variant="outline" onClick={handleClose}>Abbrechen</Button>
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending ? 'Speichern...' : 'Speichern'}
               </Button>
