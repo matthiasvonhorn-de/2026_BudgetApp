@@ -62,9 +62,29 @@ export const GET = withHandler(async (request: Request) => {
     return sum + remaining
   }, 0)
 
+  // 3. Portfolio values: latest value per active portfolio
+  const portfolioValues = await prisma.portfolio.findMany({
+    where: { isActive: true },
+    select: {
+      values: {
+        orderBy: { date: 'desc' },
+        take: 1,
+        select: { value: true },
+      },
+    },
+  })
+
+  const totalPortfolios = portfolioValues.reduce(
+    (sum, p) => sum + (p.values[0]?.value ?? 0),
+    0,
+  )
+
+  const totalAssetsWithPortfolios = totalAssets + totalPortfolios
+
   return NextResponse.json({
-    totalAssets: roundCents(totalAssets),
+    totalAssets: roundCents(totalAssetsWithPortfolios),
     totalDebts: roundCents(totalDebts),
-    netWorth: roundCents(totalAssets - totalDebts),
+    totalPortfolios: roundCents(totalPortfolios),
+    netWorth: roundCents(totalAssetsWithPortfolios - totalDebts),
   })
 })
