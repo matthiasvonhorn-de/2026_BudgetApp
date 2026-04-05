@@ -33,7 +33,7 @@ export const GET = withHandler(async () => {
       accountId: { in: accountsWithCategorizedTx.map(a => a.id) },
       OR: [
         { type: 'TRANSFER' },
-        { type: 'EXPENSE', subAccountEntryId: { not: null } },
+        { subAccountEntryId: { not: null } },
       ],
     },
     _sum: { amount: true },
