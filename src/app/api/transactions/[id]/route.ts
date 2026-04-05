@@ -4,6 +4,7 @@ import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
 import { updateTransactionSchema } from '@/lib/schemas/transactions'
 import { updateEntryFromTransaction, deleteEntryFromTransaction } from '@/lib/sub-account-entries/service'
+import { balanceIncrement } from '@/lib/money'
 
 export const PUT = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
@@ -31,7 +32,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
       const mainDiff = (data.mainAmount ?? 0) - (existing.mainAmount ?? 0)
       await tx.account.update({
         where: { id: existing.accountId },
-        data: { currentBalance: { increment: mainDiff } },
+        data: { currentBalance: balanceIncrement(mainDiff) },
       })
     }
 
@@ -69,7 +70,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
       if (subDiff !== 0) {
         await tx.account.update({
           where: { id: existing.accountId },
-          data: { currentBalance: { increment: subDiff } },
+          data: { currentBalance: balanceIncrement(subDiff) },
         })
       }
 
@@ -116,7 +117,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
         if (subDiff !== 0) {
           await tx.account.update({
             where: { id: existing.accountId },
-            data: { currentBalance: { increment: subDiff } },
+            data: { currentBalance: balanceIncrement(subDiff) },
           })
         }
       }
@@ -167,7 +168,7 @@ export const DELETE = withHandler(async (request: Request, ctx) => {
     const totalEffect = (existing.mainAmount ?? 0) + (existing.subAmount ?? 0)
     await tx.account.update({
       where: { id: existing.accountId },
-      data: { currentBalance: { increment: -totalEffect } },
+      data: { currentBalance: balanceIncrement(-totalEffect) },
     })
 
     // Delete paired TRANSFER transaction and reverse its account balance
@@ -178,7 +179,7 @@ export const DELETE = withHandler(async (request: Request, ctx) => {
         const pairedEffect = (paired.mainAmount ?? 0) + (paired.subAmount ?? 0)
         await tx.account.update({
           where: { id: paired.accountId },
-          data: { currentBalance: { increment: -pairedEffect } },
+          data: { currentBalance: balanceIncrement(-pairedEffect) },
         })
       }
     }

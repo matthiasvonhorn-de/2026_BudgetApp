@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { importTransactionsSchema } from '@/lib/schemas/transactions'
+import { balanceIncrement } from '@/lib/money'
 
 export const POST = withHandler(async (request: Request) => {
   const body = await request.json()
@@ -41,7 +42,7 @@ export const POST = withHandler(async (request: Request) => {
     const totalAmount = toImport.reduce((sum, t) => sum + t.amount, 0)
     await tx.account.update({
       where: { id: accountId },
-      data: { currentBalance: { increment: totalAmount } },
+      data: { currentBalance: balanceIncrement(totalAmount) },
     })
 
     return created

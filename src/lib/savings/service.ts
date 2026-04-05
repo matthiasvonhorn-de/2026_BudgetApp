@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { DomainError } from '@/lib/api/errors'
-import { roundCents } from '@/lib/money'
+import { roundCents, balanceIncrement } from '@/lib/money'
 import { generateSavingsSchedule, addMonths } from './schedule'
 import type { z } from 'zod'
 import type { createSavingsSchema, updateSavingsSchema } from '@/lib/schemas/savings'
@@ -453,7 +453,7 @@ export async function payEntries(accountId: string, paidUntil: string) {
 
       await tx.account.update({
         where: { id: config.accountId },
-        data: { currentBalance: { increment: entry.scheduledAmount } },
+        data: { currentBalance: balanceIncrement(entry.scheduledAmount) },
       })
 
       let giroTxId: string | null = null
@@ -472,7 +472,7 @@ export async function payEntries(accountId: string, paidUntil: string) {
         })
         await tx.account.update({
           where: { id: config.linkedAccountId },
-          data: { currentBalance: { increment: -entry.scheduledAmount } },
+          data: { currentBalance: balanceIncrement(-entry.scheduledAmount) },
         })
         giroTxId = giroTx.id
       }
@@ -510,7 +510,7 @@ export async function unpayEntry(accountId: string, entryId: string) {
       await tx.transaction.delete({ where: { id: entry.transactionId } })
       await tx.account.update({
         where: { id: entry.savingsConfig.accountId },
-        data: { currentBalance: { increment: -entry.scheduledAmount } },
+        data: { currentBalance: balanceIncrement(-entry.scheduledAmount) },
       })
     }
 
@@ -520,7 +520,7 @@ export async function unpayEntry(accountId: string, entryId: string) {
         await tx.transaction.delete({ where: { id: giroTx.id } })
         await tx.account.update({
           where: { id: giroTx.accountId },
-          data: { currentBalance: { increment: entry.scheduledAmount } },
+          data: { currentBalance: balanceIncrement(entry.scheduledAmount) },
         })
       }
     }

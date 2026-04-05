@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { createTransactionSchema } from '@/lib/schemas/transactions'
 import { createEntryFromTransaction } from '@/lib/sub-account-entries/service'
+import { balanceIncrement } from '@/lib/money'
 
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
@@ -118,11 +119,11 @@ export const POST = withHandler(async (request: Request) => {
     })
 
     // Update source account balance: mainAmount + subAmount
-    const balanceIncrement = (data.mainAmount ?? 0) + (data.subAmount ?? 0)
-    if (balanceIncrement !== 0) {
+    const balanceDelta = (data.mainAmount ?? 0) + (data.subAmount ?? 0)
+    if (balanceDelta !== 0) {
       await tx.account.update({
         where: { id: data.accountId },
-        data: { currentBalance: { increment: balanceIncrement } },
+        data: { currentBalance: balanceIncrement(balanceDelta) },
       })
     }
 
@@ -144,7 +145,7 @@ export const POST = withHandler(async (request: Request) => {
       const subAmount = -data.mainAmount
       await tx.account.update({
         where: { id: data.accountId },
-        data: { currentBalance: { increment: subAmount } },
+        data: { currentBalance: balanceIncrement(subAmount) },
       })
 
       return {
