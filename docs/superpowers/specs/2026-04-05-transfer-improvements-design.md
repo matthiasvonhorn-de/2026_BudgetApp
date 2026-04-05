@@ -31,16 +31,16 @@ Die Umbuchungsfunktion im Transaktions-Dialog wird erweitert. Bei einer Umbuchun
 | Unterkonto | Hauptkonto | ING UK "Kleidung" → DKB HK |
 | Unterkonto | Unterkonto | ING UK "Kleidung" → DKB UK "Urlaub" |
 
-**Innerhalb desselben Kontos — nur UK → UK:**
+**Innerhalb desselben Kontos:**
 
 | Quelle | Ziel | Erlaubt? |
 |--------|------|----------|
 | Hauptkonto | Unterkonto | NEIN |
 | Unterkonto | Hauptkonto | NEIN |
-| Hauptkonto | Hauptkonto | NEIN |
+| Hauptkonto | Hauptkonto | JA (z.B. Umbuchung zwischen Kategorien) |
 | Unterkonto | Unterkonto | JA (z.B. Kleidung → Urlaub) |
 
-Wenn dasselbe Konto als Quelle und Ziel gewaehlt wird, werden die Optionen "Hauptkonto" ausgeblendet — nur "Unterkonto" ist waehlbar.
+Wenn dasselbe Konto als Quelle und Ziel gewaehlt wird, muessen Quelle und Ziel denselben Typ haben (beide HK oder beide UK). Mischungen HK↔UK innerhalb desselben Kontos sind nicht erlaubt.
 
 ## Duale Felder (mainAmount / subAmount)
 
