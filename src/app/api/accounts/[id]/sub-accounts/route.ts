@@ -12,6 +12,7 @@ export const GET = withHandler(async (_, ctx) => {
         orderBy: { sortOrder: 'asc' },
         include: {
           entries: { orderBy: { date: 'asc' } },
+          linkedCategories: { select: { id: true, subAccountLinkType: true } },
         },
       },
     },
