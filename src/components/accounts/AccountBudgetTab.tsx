@@ -458,11 +458,11 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(closingPlan + subAccountsBalance)}`}>
                 {fmt(closingPlan + subAccountsBalance)}
               </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(closingActual)}`}>
-                {fmt(closingActual)}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(closingActual + subAccountsBalance)}`}>
+                {fmt(closingActual + subAccountsBalance)}
               </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(closingActual - (closingPlan + subAccountsBalance))}`}>
-                {fmt(closingActual - (closingPlan + subAccountsBalance))}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums ${amountColor(closingActual + subAccountsBalance - (closingPlan + subAccountsBalance))}`}>
+                {fmt(closingActual + subAccountsBalance - (closingPlan + subAccountsBalance))}
               </td>
               <td className="px-3 py-1 border border-border" />
             </tr>
@@ -496,11 +496,11 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingPlan)}`}>
                 {fmt(closingPlan)}
               </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingActual - subAccountsBalance)}`}>
-                {fmt(closingActual - subAccountsBalance)}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingActual)}`}>
+                {fmt(closingActual)}
               </td>
-              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingActual - subAccountsBalance - closingPlan)}`}>
-                {fmt(closingActual - subAccountsBalance - closingPlan)}
+              <td className={`px-3 py-1 border border-border text-right tabular-nums font-semibold ${amountColor(closingActual - closingPlan)}`}>
+                {fmt(closingActual - closingPlan)}
               </td>
               <td className="px-3 py-1 border border-border" />
             </tr>

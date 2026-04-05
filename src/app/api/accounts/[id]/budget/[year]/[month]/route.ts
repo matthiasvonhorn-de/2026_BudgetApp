@@ -15,13 +15,13 @@ export const GET = withHandler(async (_, ctx) => {
   const account = await prisma.account.findUnique({ where: { id } })
   if (!account) throw new DomainError('Not found', 404)
 
-  // Saldoübertrag aus Vormonat: SUM(mainAmount + subAmount) for TX before month
+  // Saldoübertrag aus Vormonat: nur mainAmount (Hauptkonto-Perspektive)
   const openingRows = await prisma.$queryRaw<[{ total: number | null }]>`
-    SELECT SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
+    SELECT SUM(mainAmount) as total
     FROM "Transaction"
     WHERE accountId = ${id}
       AND date < ${startOfMonth}
-      AND categoryId IS NOT NULL
+      AND mainAmount IS NOT NULL
   `
   const openingBalance = openingRows[0]?.total ?? 0
 
@@ -41,14 +41,14 @@ export const GET = withHandler(async (_, ctx) => {
   const budgetEntries = await prisma.budgetEntry.findMany({ where: { year, month } })
   const budgetMap = new Map(budgetEntries.map(e => [e.categoryId, e]))
 
-  // Ist-Werte pro Kategorie: SUM(mainAmount + subAmount) grouped by categoryId
+  // Ist-Werte pro Kategorie: nur mainAmount (Hauptkonto-Perspektive)
   const activityRows = await prisma.$queryRaw<Array<{ categoryId: string; total: number }>>`
-    SELECT categoryId, SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
+    SELECT categoryId, SUM(mainAmount) as total
     FROM "Transaction"
     WHERE accountId = ${id}
       AND date >= ${startOfMonth}
       AND date <= ${endOfMonth}
-      AND categoryId IS NOT NULL
+      AND mainAmount IS NOT NULL
     GROUP BY categoryId
   `
   const activityMap = new Map(activityRows.map(a => [a.categoryId, a.total]))
