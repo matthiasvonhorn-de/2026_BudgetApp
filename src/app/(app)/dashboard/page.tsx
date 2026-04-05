@@ -267,9 +267,14 @@ export default function DashboardPage() {
                   <p className="text-sm font-medium">{t.description}</p>
                   <p className="text-xs text-muted-foreground">{t.account?.name}</p>
                 </div>
-                <span className={`text-sm font-semibold ${t.amount < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                  {fmt(t.amount)}
-                </span>
+                {(() => {
+                  const displayAmt = t.mainAmount != null ? t.mainAmount : (t.subAmount ?? 0)
+                  return (
+                    <span className={`text-sm font-semibold ${displayAmt < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                      {fmt(displayAmt)}
+                    </span>
+                  )
+                })()}
               </div>
             ))}
           </CardContent>

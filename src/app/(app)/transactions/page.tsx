@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -14,11 +14,13 @@ import {
   Pagination, PaginationContent, PaginationItem, PaginationLink,
   PaginationPrevious, PaginationNext, PaginationEllipsis,
 } from '@/components/ui/pagination'
+import { format } from 'date-fns'
 import { formatDate } from '@/lib/utils'
+import { AppSelect } from '@/components/ui/app-select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { TransactionFormDialog } from '@/components/transactions/TransactionFormDialog'
 import { toast } from 'sonner'
-import type { Transaction, TransactionPage, LoanPaymentRef } from '@/types/api'
+import type { Transaction, TransactionPage, LoanPaymentRef, Account } from '@/types/api'
 
 const PAGE_SIZES = [100, 250, 500, 1000, 0] as const
 
@@ -42,6 +44,16 @@ export default function TransactionsPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [pendingDelete, setPendingDelete] = useState<{ id: string; loanPayment: LoanPaymentRef } | null>(null)
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editingRows, setEditingRows] = useState<Record<string, Partial<{
+    date: string
+    description: string
+    amount: number
+    accountId: string
+    categoryId: string | null
+  }>>>({})
+  const [isSaving, setIsSaving] = useState(false)
   const queryClient = useQueryClient()
 
   useEffect(() => {
@@ -65,12 +77,19 @@ export default function TransactionsPage() {
   const total = result?.total ?? 0
   const totalPages = pageSize > 0 ? Math.ceil(total / pageSize) : 1
 
+  const { data: allAccounts = [] } = useQuery<Account[]>({
+    queryKey: ['accounts'],
+    queryFn: () => fetch('/api/accounts').then(r => r.json()),
+    enabled: isEditMode,
+  })
+
   const deleteMutation = useMutation({
     mutationFn: ({ id, revertLoan }: { id: string; revertLoan: boolean }) =>
       fetch(`/api/transactions/${id}?revertLoan=${revertLoan}`, { method: 'DELETE' }).then(r => r.json()),
     onSuccess: (_, { revertLoan }) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
       if (revertLoan) queryClient.invalidateQueries({ queryKey: ['loans'] })
       setPendingDelete(null)
       toast.success('Transaktion gelöscht')
@@ -83,6 +102,49 @@ export default function TransactionsPage() {
     } else {
       if (confirm('Transaktion löschen?')) deleteMutation.mutate({ id: t.id, revertLoan: false })
     }
+  }
+
+  async function handleBatchSave() {
+    setIsSaving(true)
+    const errors: string[] = []
+
+    for (const [id, changes] of Object.entries(editingRows)) {
+      try {
+        const original = transactions.find(t => t.id === id)
+        if (!original) continue
+
+        const body: Record<string, unknown> = {}
+        if (changes.date !== undefined) body.date = changes.date
+        if (changes.description !== undefined) body.description = changes.description
+        if (changes.amount !== undefined) {
+          body.mainAmount = original.mainType === 'INCOME' ? Math.abs(changes.amount) : -Math.abs(changes.amount)
+        }
+        if (changes.accountId !== undefined) body.accountId = changes.accountId
+        if (changes.categoryId !== undefined) body.categoryId = changes.categoryId || null
+
+        const res = await fetch(`/api/transactions/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) throw new Error(`Fehler bei Transaktion ${original.description}`)
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : 'Unbekannter Fehler')
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['transactions'] })
+    queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
+
+    if (errors.length > 0) {
+      toast.error(`${errors.length} Fehler beim Speichern`)
+    } else {
+      toast.success('Alle Änderungen gespeichert')
+      setIsEditMode(false)
+      setEditingRows({})
+    }
+    setIsSaving(false)
   }
 
   return (
@@ -132,7 +194,39 @@ export default function TransactionsPage() {
               <th className="text-left p-3 font-medium">Konto</th>
               <th className="text-left p-3 font-medium">Kategorie</th>
               <th className="text-right p-3 font-medium">Betrag</th>
-              <th className="p-3"></th>
+              <th className="p-3">
+                {isEditMode ? (
+                  <div className="flex items-center gap-1 justify-end">
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 px-2"
+                      onClick={handleBatchSave}
+                      disabled={isSaving || Object.keys(editingRows).length === 0}
+                    >
+                      {isSaving ? 'Speichern...' : 'Speichern'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2"
+                      onClick={() => { setIsEditMode(false); setEditingRows({}) }}
+                      disabled={isSaving}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-foreground h-7 px-2"
+                    onClick={() => setIsEditMode(true)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -140,46 +234,117 @@ export default function TransactionsPage() {
               <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Laden...</td></tr>
             ) : transactions.length === 0 ? (
               <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Keine Transaktionen gefunden</td></tr>
-            ) : transactions.map((t: Transaction) => (
-              <tr key={t.id} className="border-t hover:bg-muted/50">
-                <td className="p-3 text-muted-foreground whitespace-nowrap">{formatDate(t.date)}</td>
-                <td className="p-3">
-                  <p className="font-medium">{t.description}</p>
-                  {t.payee && <p className="text-xs text-muted-foreground">{t.payee}</p>}
-                </td>
-                <td className="p-3">
-                  {t.account && (
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: t.account.color }} />
-                      <span className="text-xs">{t.account.name}</span>
+            ) : transactions.map((t: Transaction) => {
+              if (isEditMode) {
+                const rowChanges = editingRows[t.id]
+                const isChanged = !!rowChanges
+                const hasEntry = !!t.subAccountEntryId
+
+                const currentDate = rowChanges?.date ?? format(new Date(t.date), 'yyyy-MM-dd')
+                const currentDesc = rowChanges?.description ?? t.description
+                const displayAmount = t.mainAmount != null ? t.mainAmount : (t.subAmount ?? 0)
+                const currentAmount = rowChanges?.amount ?? Math.abs(displayAmount)
+
+                function updateRow(field: string, value: unknown) {
+                  setEditingRows(prev => ({
+                    ...prev,
+                    [t.id]: { ...prev[t.id], [field]: value },
+                  }))
+                }
+
+                return (
+                  <tr key={t.id} className={`border-t ${isChanged ? 'bg-amber-50 dark:bg-amber-950/20' : 'hover:bg-muted/50'}`}>
+                    <td className="p-2">
+                      <Input type="date" value={currentDate} onChange={e => updateRow('date', e.target.value)} className="h-8 text-sm w-32" />
+                    </td>
+                    <td className="p-2">
+                      <Input value={currentDesc} onChange={e => updateRow('description', e.target.value)} className="h-8 text-sm" />
+                    </td>
+                    <td className="p-2">
+                      {hasEntry ? (
+                        <span className="text-xs text-muted-foreground">{t.account?.name}</span>
+                      ) : (
+                        <AppSelect
+                          value={rowChanges?.accountId ?? t.accountId}
+                          onValueChange={v => updateRow('accountId', v)}
+                          options={allAccounts.map((a: Account) => ({ value: a.id, label: a.name }))}
+                          placeholder="Konto"
+                        />
+                      )}
+                    </td>
+                    <td className="p-2">
+                      <span className="text-xs text-muted-foreground">{t.category?.name ?? '—'}</span>
+                    </td>
+                    <td className="p-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={currentAmount}
+                        onChange={e => updateRow('amount', parseFloat(e.target.value) || 0)}
+                        className="h-8 text-sm text-right w-28"
+                      />
+                    </td>
+                    <td className="p-2" />
+                  </tr>
+                )
+              }
+
+              return (
+                <tr key={t.id} className="border-t hover:bg-muted/50">
+                  <td className="p-3 text-muted-foreground whitespace-nowrap">{formatDate(t.date)}</td>
+                  <td className="p-3">
+                    <p className="font-medium">{t.description}</p>
+                    {t.payee && <p className="text-xs text-muted-foreground">{t.payee}</p>}
+                  </td>
+                  <td className="p-3">
+                    {t.account && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: t.account.color }} />
+                        <span className="text-xs">{t.account.name}</span>
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {t.category ? (
+                      <Badge variant="outline" style={{ borderColor: t.category.color, color: t.category.color }}>
+                        {t.category.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">—</span>
+                    )}
+                  </td>
+                  {(() => {
+                    const displayAmt = t.mainAmount != null ? t.mainAmount : (t.subAmount ?? 0)
+                    return (
+                      <td className={`p-3 text-right font-semibold whitespace-nowrap ${displayAmt < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                        {fmt(displayAmt)}
+                      </td>
+                    )
+                  })()}
+                  <td className="p-3">
+                    <div className="flex items-center gap-1 justify-end">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-foreground h-7 px-2"
+                        onClick={() => setEditingTransaction(t)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive h-7 px-2"
+                        onClick={() => handleDeleteClick(t)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        ×
+                      </Button>
                     </div>
-                  )}
-                </td>
-                <td className="p-3">
-                  {t.category ? (
-                    <Badge variant="outline" style={{ borderColor: t.category.color, color: t.category.color }}>
-                      {t.category.name}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground text-xs">—</span>
-                  )}
-                </td>
-                <td className={`p-3 text-right font-semibold whitespace-nowrap ${t.amount < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                  {fmt(t.amount)}
-                </td>
-                <td className="p-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground hover:text-destructive h-7 px-2"
-                    onClick={() => handleDeleteClick(t)}
-                    disabled={deleteMutation.isPending}
-                  >
-                    ×
-                  </Button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -226,6 +391,11 @@ export default function TransactionsPage() {
       )}
 
       <TransactionFormDialog open={open} onOpenChange={setOpen} />
+      <TransactionFormDialog
+        open={!!editingTransaction}
+        onOpenChange={(v) => { if (!v) setEditingTransaction(null) }}
+        editTransaction={editingTransaction}
+      />
 
       {/* Dialog für Kreditraten-Transaktionen */}
       <Dialog open={!!pendingDelete} onOpenChange={v => !v && setPendingDelete(null)}>

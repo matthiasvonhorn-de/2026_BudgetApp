@@ -5,9 +5,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev          # Start Next.js dev server → http://localhost:3000
+npm run dev          # Start Next.js dev server → http://localhost:3000 (dev.db)
 npm run build        # Production build
 npm run lint         # ESLint
+
+# Production server (separate database)
+npm run prod         # Build + start production server → http://localhost:3001 (prod.db)
+npm run prod:start   # Start production server without rebuild
 
 # Electron desktop build
 npm run electron:dev         # Run Electron with current build
@@ -25,7 +29,25 @@ npx prisma generate          # Regenerate client types
 sqlite3 prisma/dev.db "ALTER TABLE ..."
 ```
 
-Database file: `prisma/dev.db`. Singleton client in `src/lib/prisma.ts` uses `PrismaLibSql` adapter configured in `prisma.config.ts`.
+Database files: `prisma/dev.db` (development), `prisma/prod.db` (production). Singleton client in `src/lib/prisma.ts` uses `PrismaLibSql` adapter configured in `prisma.config.ts`.
+
+### Schema migrations
+
+Every schema change MUST have a SQL migration file in `prisma/migrations/`:
+
+```bash
+# 1. Create migration file (naming: YYYYMMDD_description.sql)
+prisma/migrations/20260405_add_column_x.sql
+
+# 2. During development — apply to dev.db only
+sqlite3 prisma/dev.db < prisma/migrations/20260405_add_column_x.sql
+npx prisma generate
+
+# 3. After PR is merged to main — apply to prod.db
+sqlite3 prisma/prod.db < prisma/migrations/20260405_add_column_x.sql
+```
+
+**IMPORTANT**: Never apply migrations to `prod.db` during development. Only migrate prod after the PR has been merged to `main` and the user explicitly asks for it.
 
 ## Architecture
 

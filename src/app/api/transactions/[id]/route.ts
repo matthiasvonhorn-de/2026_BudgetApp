@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
 import { updateTransactionSchema } from '@/lib/schemas/transactions'
+import { updateEntryFromTransaction, deleteEntryFromTransaction } from '@/lib/sub-account-entries/service'
 
 export const PUT = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
@@ -16,105 +17,108 @@ export const PUT = withHandler(async (request: Request, ctx) => {
   if (!existing) throw new DomainError('Nicht gefunden', 404)
 
   const transaction = await prisma.$transaction(async (tx) => {
-    const newAmount = data.amount ?? existing.amount
+    const newMainAmount = data.mainAmount !== undefined ? (data.mainAmount ?? null) : existing.mainAmount
+    const newMainType = data.mainType ?? existing.mainType
     const newDate = data.date ? new Date(data.date) : existing.date
     const newDescription = data.description ?? existing.description
 
-    // Update source account balance if amount changed
-    if (data.amount !== undefined && data.amount !== existing.amount) {
-      const diff = data.amount - existing.amount
+    // Calculate balance diff: (newMain + newSub) - (oldMain + oldSub)
+    // Note: subAmount may be updated by updateEntryFromTransaction later
+    const oldTotal = (existing.mainAmount ?? 0) + (existing.subAmount ?? 0)
+
+    // Update source account balance if mainAmount changed
+    if (data.mainAmount !== undefined && (data.mainAmount ?? null) !== existing.mainAmount) {
+      const mainDiff = (data.mainAmount ?? 0) - (existing.mainAmount ?? 0)
       await tx.account.update({
         where: { id: existing.accountId },
-        data: { currentBalance: { increment: diff } },
+        data: { currentBalance: { increment: mainDiff } },
       })
+    }
+
+    // Sub-Only-TX: subAmount direkt aktualisieren + Entry synchronisieren
+    if (data.subAmount !== undefined && existing.mainAmount == null) {
+      const newSubAmount = data.subAmount ?? existing.subAmount ?? 0
+      const newSubType = newSubAmount > 0 ? 'INCOME' : 'EXPENSE'
+      const subDiff = newSubAmount - (existing.subAmount ?? 0)
+
+      const updated = await tx.transaction.update({
+        where: { id },
+        data: {
+          ...(data.date && { date: newDate }),
+          ...(data.description && { description: newDescription }),
+          subAmount: newSubAmount,
+          subType: newSubType,
+          ...(data.status && { status: data.status }),
+        },
+        include: { account: true, category: { include: { subAccountGroup: true } } },
+      })
+
+      // Entry synchronisieren
+      if (existing.subAccountEntryId) {
+        await tx.subAccountEntry.update({
+          where: { id: existing.subAccountEntryId },
+          data: {
+            amount: newSubAmount,
+            ...(data.date && { date: newDate }),
+            ...(data.description && { description: newDescription }),
+          },
+        })
+      }
+
+      // Balance aktualisieren
+      if (subDiff !== 0) {
+        await tx.account.update({
+          where: { id: existing.accountId },
+          data: { currentBalance: { increment: subDiff } },
+        })
+      }
+
+      return updated
     }
 
     const updated = await tx.transaction.update({
       where: { id },
       data: {
-        ...data,
         ...(data.date && { date: newDate }),
+        ...(data.mainAmount !== undefined && { mainAmount: data.mainAmount ?? null }),
+        ...(data.mainType && { mainType: newMainType }),
+        ...(data.description && { description: newDescription }),
+        ...(data.payee !== undefined && { payee: data.payee }),
+        ...(data.notes !== undefined && { notes: data.notes }),
+        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
+        ...(data.status && { status: data.status }),
       },
       include: { account: true, category: { include: { subAccountGroup: true } } },
     })
 
-    // Sync sub-account entry
+    // Delegate entry + TRANSFER sync to service layer (nur für TX mit mainAmount)
     const newCategoryId = data.categoryId !== undefined ? data.categoryId : existing.categoryId
-    let newSubGroupId: string | null = null
-    let newLinkType = 'BOOKING'
-    if (newCategoryId) {
-      const cat = await tx.category.findUnique({
-        where: { id: newCategoryId },
-        select: { subAccountGroupId: true, subAccountLinkType: true },
-      })
-      newSubGroupId = cat?.subAccountGroupId ?? null
-      newLinkType = cat?.subAccountLinkType ?? 'BOOKING'
-    }
+    if (newMainAmount != null) {
+      const oldMainForEntry = existing.mainAmount ?? 0
 
-    const hadEntry = !!existing.subAccountEntryId
-
-    if (hadEntry && newSubGroupId) {
-      // Update existing sub-account entry
-      await tx.subAccountEntry.update({
-        where: { id: existing.subAccountEntryId! },
-        data: { date: newDate, description: newDescription, amount: -newAmount, groupId: newSubGroupId },
+      await updateEntryFromTransaction(tx, {
+        newMainAmount: newMainAmount as number,
+        oldMainAmount: oldMainForEntry,
+        date: newDate,
+        description: newDescription,
+        newCategoryId,
+        existingSubAccountEntryId: existing.subAccountEntryId,
+        existingTransferId: existing.transferToId,
+        existingStatus: existing.status as any,
+        transactionId: id,
       })
-    } else if (hadEntry && !newSubGroupId) {
-      // Remove sub-account entry
-      await tx.transaction.update({ where: { id }, data: { subAccountEntryId: null } })
-      await tx.subAccountEntry.delete({ where: { id: existing.subAccountEntryId! } })
-    } else if (!hadEntry && newSubGroupId) {
-      // Create new sub-account entry
-      const entry = await tx.subAccountEntry.create({
-        data: { date: newDate, description: newDescription, amount: -newAmount, fromBudget: true, groupId: newSubGroupId },
-      })
-      await tx.transaction.update({ where: { id }, data: { subAccountEntryId: entry.id } })
-    }
 
-    // Sync paired TRANSFER transaction
-    if (existing.transferToId) {
-      const paired = await tx.transaction.findUnique({ where: { id: existing.transferToId } })
-      if (paired) {
-        const pairedDiff = -(newAmount - existing.amount)
-        if (data.amount !== undefined && data.amount !== existing.amount) {
+      // If entry was synced, subAmount changed too — recalculate balance diff
+      const updatedTx = await tx.transaction.findUnique({ where: { id } })
+      if (updatedTx) {
+        const newTotal = (updatedTx.mainAmount ?? 0) + (updatedTx.subAmount ?? 0)
+        const subDiff = newTotal - oldTotal - ((data.mainAmount !== undefined ? ((data.mainAmount ?? 0) - (existing.mainAmount ?? 0)) : 0))
+        if (subDiff !== 0) {
           await tx.account.update({
-            where: { id: paired.accountId },
-            data: { currentBalance: { increment: pairedDiff } },
+            where: { id: existing.accountId },
+            data: { currentBalance: { increment: subDiff } },
           })
         }
-        await tx.transaction.update({
-          where: { id: existing.transferToId },
-          data: {
-            ...(data.date && { date: newDate }),
-            ...(data.description && { description: newDescription }),
-            ...(data.amount !== undefined && { amount: -newAmount }),
-          },
-        })
-      }
-    } else if (!existing.transferToId && newSubGroupId && newLinkType === 'TRANSFER') {
-      // Category changed to a TRANSFER-linked category — create paired transaction
-      const group = await tx.subAccountGroup.findUnique({
-        where: { id: newSubGroupId },
-        include: { subAccount: true },
-      })
-      if (group) {
-        const targetAccountId = group.subAccount.accountId
-        const paired = await tx.transaction.create({
-          data: {
-            date: newDate,
-            amount: -newAmount,
-            description: newDescription,
-            accountId: targetAccountId,
-            categoryId: newCategoryId,
-            type: 'TRANSFER',
-            status: existing.status,
-          },
-        })
-        await tx.account.update({
-          where: { id: targetAccountId },
-          data: { currentBalance: { increment: -newAmount } },
-        })
-        await tx.transaction.update({ where: { id }, data: { transferToId: paired.id } })
       }
     }
 
@@ -132,7 +136,6 @@ export const DELETE = withHandler(async (request: Request, ctx) => {
   const existing = await prisma.transaction.findUnique({ where: { id } })
   if (!existing) throw new DomainError('Nicht gefunden', 404)
 
-  // Prüfen ob eine Kreditrate mit dieser Transaktion verknüpft ist
   const linkedPayment = await prisma.loanPayment.findFirst({
     where: { transactionId: id },
   })
@@ -140,7 +143,7 @@ export const DELETE = withHandler(async (request: Request, ctx) => {
   await prisma.$transaction(async (tx) => {
     const pairedId = existing.transferToId
 
-    // Kreditrate: transactionId immer bereinigen; paidAt nur bei revertLoan zurücksetzen
+    // Loan payment cleanup
     if (linkedPayment) {
       await tx.loanPayment.update({
         where: { loanId_periodNumber: { loanId: linkedPayment.loanId, periodNumber: linkedPayment.periodNumber } },
@@ -151,29 +154,31 @@ export const DELETE = withHandler(async (request: Request, ctx) => {
       })
     }
 
-    // Unlink sub-account entry before deleting
-    await tx.transaction.update({ where: { id }, data: { subAccountEntryId: null, transferToId: null } })
+    // Delete linked sub-account entry via service
+    await deleteEntryFromTransaction(tx, existing.subAccountEntryId)
+
+    // Unlink transfer and delete transaction
+    if (pairedId) {
+      await tx.transaction.update({ where: { id }, data: { transferToId: null } })
+    }
     await tx.transaction.delete({ where: { id } })
 
-    // Reverse source account balance
+    // Reverse source account balance: -(mainAmount + subAmount)
+    const totalEffect = (existing.mainAmount ?? 0) + (existing.subAmount ?? 0)
     await tx.account.update({
       where: { id: existing.accountId },
-      data: { currentBalance: { increment: -existing.amount } },
+      data: { currentBalance: { increment: -totalEffect } },
     })
-
-    // Delete linked sub-account entry
-    if (existing.subAccountEntryId) {
-      await tx.subAccountEntry.delete({ where: { id: existing.subAccountEntryId } })
-    }
 
     // Delete paired TRANSFER transaction and reverse its account balance
     if (pairedId) {
       const paired = await tx.transaction.findUnique({ where: { id: pairedId } })
       if (paired) {
         await tx.transaction.delete({ where: { id: pairedId } })
+        const pairedEffect = (paired.mainAmount ?? 0) + (paired.subAmount ?? 0)
         await tx.account.update({
           where: { id: paired.accountId },
-          data: { currentBalance: { increment: -paired.amount } },
+          data: { currentBalance: { increment: -pairedEffect } },
         })
       }
     }

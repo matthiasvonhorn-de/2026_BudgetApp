@@ -29,16 +29,16 @@ export const POST = withHandler(async (_, ctx) => {
   })
   const budgetMap = new Map(budgetEntries.map(e => [e.categoryId, e]))
 
-  const activities = await prisma.transaction.groupBy({
-    by: ['categoryId'],
-    where: {
-      accountId: id,
-      date: { gte: startOfMonth, lte: endOfMonth },
-      categoryId: { in: categoryIds },
-    },
-    _sum: { amount: true },
-  })
-  const activityMap = new Map(activities.map(a => [a.categoryId!, a._sum.amount ?? 0]))
+  const activityRows = await prisma.$queryRaw<Array<{ categoryId: string; total: number }>>`
+    SELECT categoryId, SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
+    FROM "Transaction"
+    WHERE accountId = ${id}
+      AND date >= ${startOfMonth}
+      AND date <= ${endOfMonth}
+      AND categoryId IS NOT NULL
+    GROUP BY categoryId
+  `
+  const activityMap = new Map(activityRows.map(a => [a.categoryId, a.total]))
 
   const rollovers = categories.map(cat => {
     const entry = budgetMap.get(cat.id)

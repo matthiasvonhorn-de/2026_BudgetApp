@@ -7,6 +7,8 @@
     "dev": "node node_modules/next/dist/bin/next dev",
     "build": "node node_modules/next/dist/bin/next build",
     "start": "node node_modules/next/dist/bin/next start",
+    "prod": "npm run build && node scripts/copy-static.js && DATABASE_URL=file:$PWD/prisma/prod.db PORT=3001 node .next/standalone/server.js",
+    "prod:start": "DATABASE_URL=file:$PWD/prisma/prod.db PORT=3001 node .next/standalone/server.js",
     "lint": "eslint",
     "electron:dev": "electron .",
     "electron:build": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac zip",

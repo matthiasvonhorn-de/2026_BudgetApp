@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
-import type { AccountType } from '@prisma/client'
 
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
@@ -12,30 +11,32 @@ export const GET = withHandler(async (request: Request) => {
   const startOfMonth = new Date(year, month - 1, 1)
   const endOfMonth = new Date(year, month, 0, 23, 59, 59)
 
-  const activities = await prisma.transaction.groupBy({
-    by: ['categoryId'],
-    where: {
-      date: { gte: startOfMonth, lte: endOfMonth },
-      type: 'EXPENSE',
-      categoryId: { not: null },
-      account: { isActive: true, type: { notIn: ['SPARPLAN', 'FESTGELD'] as AccountType[] } },
-    },
-    _sum: { amount: true },
-  })
+  const activityRows = await prisma.$queryRaw<Array<{ categoryId: string; total: number }>>`
+    SELECT t.categoryId, SUM(COALESCE(t.mainAmount, 0)) as total
+    FROM "Transaction" t
+    JOIN Account a ON t.accountId = a.id
+    WHERE t.date >= ${startOfMonth}
+      AND t.date <= ${endOfMonth}
+      AND t.mainType = 'EXPENSE'
+      AND t.categoryId IS NOT NULL
+      AND a.isActive = 1
+      AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+    GROUP BY t.categoryId
+  `
 
-  const categoryIds = activities.map(a => a.categoryId!).filter(Boolean)
+  const categoryIds = activityRows.map(a => a.categoryId).filter(Boolean)
   const categories = await prisma.category.findMany({
     where: { id: { in: categoryIds } },
     select: { id: true, name: true, color: true },
   })
   const catMap = new Map(categories.map(c => [c.id, c]))
 
-  const result = activities
+  const result = activityRows
     .map(a => ({
-      categoryId: a.categoryId!,
-      name: catMap.get(a.categoryId!)?.name ?? 'Unbekannt',
-      color: catMap.get(a.categoryId!)?.color ?? '#6366f1',
-      amount: Math.abs(a._sum.amount ?? 0),
+      categoryId: a.categoryId,
+      name: catMap.get(a.categoryId)?.name ?? 'Unbekannt',
+      color: catMap.get(a.categoryId)?.color ?? '#6366f1',
+      amount: Math.abs(a.total),
     }))
     .filter(r => r.amount > 0)
     .sort((a, b) => b.amount - a.amount)

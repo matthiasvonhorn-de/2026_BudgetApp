@@ -85,14 +85,16 @@ enum CategoryType {
 model Transaction {
   id                  String            @id @default(cuid())
   date                DateTime
-  amount              Float
+  mainAmount          Float?
+  mainType            TransactionType   @default(INCOME)
+  subAmount           Float?
+  subType             TransactionType?
   description         String
   payee               String?
   notes               String?
   accountId           String
   categoryId          String?
   status              TransactionStatus @default(PENDING)
-  type                TransactionType   @default(EXPENSE)
   importHash          String?           @unique
   isReconciled        Boolean           @default(false)
   subAccountEntryId   String?           @unique

@@ -443,8 +443,8 @@ export async function payEntries(accountId: string, paidUntil: string) {
       const savingsTx = await tx.transaction.create({
         data: {
           accountId: config.accountId,
-          type: 'INCOME',
-          amount: entry.scheduledAmount,
+          mainAmount: entry.scheduledAmount,
+          mainType: 'INCOME',
           description: entry.entryType === 'INTEREST' ? 'Zinsgutschrift' : 'Sparrate',
           date: entry.dueDate,
           status: 'CLEARED',
@@ -462,8 +462,8 @@ export async function payEntries(accountId: string, paidUntil: string) {
         const giroTx = await tx.transaction.create({
           data: {
             accountId: config.linkedAccountId,
-            type: 'EXPENSE',
-            amount: -entry.scheduledAmount,
+            mainAmount: -entry.scheduledAmount,
+            mainType: 'EXPENSE',
             description: `Sparrate: ${config.account.name}`,
             date: entry.dueDate,
             categoryId: config.categoryId ?? null,
