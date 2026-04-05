@@ -67,7 +67,7 @@ export async function createLinkedEntry(input: CreateLinkedEntryInput) {
     // Update account balance
     await tx.account.update({
       where: { id: accountId },
-      data: { currentBalance: { increment: transactionAmount } },
+      data: { currentBalance: { increment: transaction.amount } },
     })
 
     return { entry, transaction }
