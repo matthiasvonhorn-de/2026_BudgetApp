@@ -1,6 +1,7 @@
 import { TransactionStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DomainError } from '@/lib/api/errors'
+import { balanceIncrement } from '@/lib/money'
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -72,7 +73,7 @@ export async function createLinkedEntry(input: CreateLinkedEntryInput) {
     // Update account balance: only subAmount contributes (mainAmount is null)
     await tx.account.update({
       where: { id: accountId },
-      data: { currentBalance: { increment: subAmount } },
+      data: { currentBalance: balanceIncrement(subAmount) },
     })
 
     return { entry, transaction }
@@ -133,7 +134,7 @@ export async function updateLinkedEntry(entryId: string, input: UpdateLinkedEntr
       const balanceDiff = (oldMainAmount + newSubAmount) - (oldMainAmount + oldSubAmount)
       await tx.account.update({
         where: { id: existing.group.subAccount.accountId },
-        data: { currentBalance: { increment: balanceDiff } },
+        data: { currentBalance: balanceIncrement(balanceDiff) },
       })
     }
 
@@ -161,7 +162,7 @@ export async function deleteLinkedEntry(entryId: string) {
       const totalEffect = (existing.transaction.mainAmount ?? 0) + (existing.transaction.subAmount ?? 0)
       await tx.account.update({
         where: { id: accountId },
-        data: { currentBalance: { increment: -totalEffect } },
+        data: { currentBalance: balanceIncrement(-totalEffect) },
       })
       // Delete transaction first (holds FK to entry)
       await tx.transaction.delete({ where: { id: existing.transaction.id } })
@@ -238,7 +239,7 @@ export async function createEntryFromTransaction(tx: TxClient, input: CreateEntr
 
       await tx.account.update({
         where: { id: targetAccountId },
-        data: { currentBalance: { increment: pairedAmount } },
+        data: { currentBalance: balanceIncrement(pairedAmount) },
       })
 
       await tx.transaction.update({
@@ -321,7 +322,7 @@ export async function updateEntryFromTransaction(tx: TxClient, input: UpdateEntr
       if (newPairedMain !== oldPairedMain) {
         await tx.account.update({
           where: { id: paired.accountId },
-          data: { currentBalance: { increment: newPairedMain - oldPairedMain } },
+          data: { currentBalance: balanceIncrement(newPairedMain - oldPairedMain) },
         })
       }
       await tx.transaction.update({
@@ -355,7 +356,7 @@ export async function updateEntryFromTransaction(tx: TxClient, input: UpdateEntr
       })
       await tx.account.update({
         where: { id: targetAccountId },
-        data: { currentBalance: { increment: pairedMain } },
+        data: { currentBalance: balanceIncrement(pairedMain) },
       })
       await tx.transaction.update({ where: { id: transactionId }, data: { transferToId: paired.id } })
     }

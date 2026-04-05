@@ -73,7 +73,8 @@ src/hooks/              # Custom React hooks
 
 ### Data model key points
 - **Categories are per-account**: `CategoryGroup.accountId` is required — groups/categories/budgets are scoped to a specific account.
-- **Amount convention**: Negative = expense, Positive = income.
+- **Amount convention**: Negative = expense, Positive = income. Transaction has dual fields: `mainAmount`/`mainType` (Hauptkonto) and `subAmount`/`subType` (Unterkonto).
+- **Balance updates**: NEVER use raw `currentBalance: { increment: value }`. ALWAYS use `balanceIncrement(value)` from `@/lib/money` which rounds to cents. This prevents floating-point drift.
 - **Transaction status**: `PENDING` → `CLEARED` → `RECONCILED`.
 - **Duplicate detection**: `Transaction.importHash` unique index.
 - **Budget**: `BudgetEntry` unique on `(categoryId, month, year)`.

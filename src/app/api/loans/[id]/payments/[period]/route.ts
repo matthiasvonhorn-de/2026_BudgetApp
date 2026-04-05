@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { generateSchedule } from '@/lib/loans/amortization'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
+import { balanceIncrement } from '@/lib/money'
 
 const UpdatePaymentSchema = z.object({
   paid: z.boolean().optional(),
@@ -76,7 +77,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
         })
         await tx.account.update({
           where: { id: loanData.accountId },
-          data: { currentBalance: { increment: totalPayment } },
+          data: { currentBalance: balanceIncrement(totalPayment) },
         })
         await tx.loanPayment.update({
           where: { loanId_periodNumber: { loanId: id, periodNumber } },
@@ -89,7 +90,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
           await tx.transaction.delete({ where: { id: existing.id } })
           await tx.account.update({
             where: { id: loanData.accountId },
-            data: { currentBalance: { increment: -((existing.mainAmount ?? 0) + (existing.subAmount ?? 0)) } },
+            data: { currentBalance: balanceIncrement(-((existing.mainAmount ?? 0) + (existing.subAmount ?? 0))) },
           })
         }
         await tx.loanPayment.update({
@@ -111,7 +112,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
           })
           await tx.account.update({
             where: { id: loanData.accountId },
-            data: { currentBalance: { increment: diff } },
+            data: { currentBalance: balanceIncrement(diff) },
           })
         }
       }

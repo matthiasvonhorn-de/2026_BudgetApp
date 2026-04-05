@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { calcAnnuityFromRates, generateSchedule } from '@/lib/loans/amortization'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
-import { roundCents } from '@/lib/money'
+import { roundCents, balanceIncrement } from '@/lib/money'
 
 const UpdateSchema = z.object({
   // Metadaten — änderbar ohne Plan-Neuberechnung
@@ -147,7 +147,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
           await tx.transaction.delete({ where: { id: t.id } })
           await tx.account.update({
             where: { id: t.accountId },
-            data: { currentBalance: { increment: -((t.mainAmount ?? 0) + (t.subAmount ?? 0)) } },
+            data: { currentBalance: balanceIncrement(-((t.mainAmount ?? 0) + (t.subAmount ?? 0))) },
           })
         }
       }
