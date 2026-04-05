@@ -21,6 +21,8 @@ export const GET = withHandler(async (request: Request) => {
       AND t.categoryId IS NOT NULL
       AND a.isActive = 1
       AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+      AND t.transferToId IS NULL
+      AND NOT EXISTS (SELECT 1 FROM "Transaction" t2 WHERE t2.transferToId = t.id)
     GROUP BY t.categoryId
   `
 
