@@ -121,9 +121,14 @@ function CategoryActivityDialog({
                         <p className="font-medium">{t.description}</p>
                         {t.payee && <p className="text-xs text-muted-foreground">{t.payee}</p>}
                       </td>
-                      <td className={`p-3 text-right font-semibold tabular-nums ${t.amount < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                        {fmt(t.amount)}
-                      </td>
+                      {(() => {
+                        const displayAmt = (t.mainAmount ?? 0) + (t.subAmount ?? 0)
+                        return (
+                          <td className={`p-3 text-right font-semibold tabular-nums ${displayAmt < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                            {fmt(displayAmt)}
+                          </td>
+                        )
+                      })()}
                     </tr>
                   ))}
                 </tbody>
@@ -183,15 +188,15 @@ function BookTransactionDialog({
     mutationFn: () => {
       if (!state.cat) throw new Error()
       const raw = parseFloat(amount.replace(',', '.'))
-      const signedAmount = state.cat.type === 'INCOME' ? Math.abs(raw) : -Math.abs(raw)
+      const mainAmount = state.cat.type === 'INCOME' ? Math.abs(raw) : -Math.abs(raw)
       return fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          date, amount: signedAmount, description,
+          date, mainAmount, mainType: state.cat.type as 'INCOME' | 'EXPENSE' | 'TRANSFER',
+          description,
           accountId: selAccountId,
           categoryId: state.cat.id,
-          type: state.cat.type as 'INCOME' | 'EXPENSE' | 'TRANSFER',
           skipSubAccountEntry,
           skipPairedTransfer,
         }),

@@ -38,7 +38,6 @@ export function ImportStep3Categorize() {
           payee: t.payee,
           categoryId: t.categoryId ?? null,
           hash: t.hash,
-          type: t.amount >= 0 ? 'INCOME' : 'EXPENSE',
         }))
 
       const res = await fetch('/api/import', {

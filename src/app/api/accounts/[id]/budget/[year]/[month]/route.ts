@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
+import { Prisma } from '@prisma/client'
 
 export const GET = withHandler(async (_, ctx) => {
   const { id, year: yearStr, month: monthStr } = await (ctx as { params: Promise<{ id: string; year: string; month: string }> }).params
@@ -14,18 +15,15 @@ export const GET = withHandler(async (_, ctx) => {
   const account = await prisma.account.findUnique({ where: { id } })
   if (!account) throw new DomainError('Not found', 404)
 
-  // Saldoübertrag aus Vormonat: Summe aller kategorisierten Transaktionen vor Monatsbeginn.
-  // Gleicher Filter wie totalActivity — nur Transaktionen, die in Budget-Zeilen sichtbar sind.
-  // So gilt: closingBalanceActual(Vormonat) === openingBalance(dieserMonat)
-  const openingResult = await prisma.transaction.aggregate({
-    where: {
-      accountId: id,
-      date: { lt: startOfMonth },
-      categoryId: { not: null },
-    },
-    _sum: { amount: true },
-  })
-  const openingBalance = openingResult._sum.amount ?? 0
+  // Saldoübertrag aus Vormonat: SUM(mainAmount + subAmount) for TX before month
+  const openingRows = await prisma.$queryRaw<[{ total: number | null }]>`
+    SELECT SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
+    FROM "Transaction"
+    WHERE accountId = ${id}
+      AND date < ${startOfMonth}
+      AND categoryId IS NOT NULL
+  `
+  const openingBalance = openingRows[0]?.total ?? 0
 
   // Nur Gruppen dieses Kontos laden
   const allGroups = await prisma.categoryGroup.findMany({
@@ -43,17 +41,17 @@ export const GET = withHandler(async (_, ctx) => {
   const budgetEntries = await prisma.budgetEntry.findMany({ where: { year, month } })
   const budgetMap = new Map(budgetEntries.map(e => [e.categoryId, e]))
 
-  // Ist-Werte pro Kategorie — nur Transaktionen dieses Kontos
-  const activities = await prisma.transaction.groupBy({
-    by: ['categoryId'],
-    where: {
-      accountId: id,
-      date: { gte: startOfMonth, lte: endOfMonth },
-      categoryId: { not: null },
-    },
-    _sum: { amount: true },
-  })
-  const activityMap = new Map(activities.map(a => [a.categoryId!, a._sum.amount ?? 0]))
+  // Ist-Werte pro Kategorie: SUM(mainAmount + subAmount) grouped by categoryId
+  const activityRows = await prisma.$queryRaw<Array<{ categoryId: string; total: number }>>`
+    SELECT categoryId, SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
+    FROM "Transaction"
+    WHERE accountId = ${id}
+      AND date >= ${startOfMonth}
+      AND date <= ${endOfMonth}
+      AND categoryId IS NOT NULL
+    GROUP BY categoryId
+  `
+  const activityMap = new Map(activityRows.map(a => [a.categoryId, a.total]))
 
   // Daten zusammenführen
   const groups = allGroups
@@ -100,26 +98,15 @@ export const GET = withHandler(async (_, ctx) => {
   })
   const openingBalancePlan = openingPlanResult._sum.budgeted ?? 0
 
-  // Sub-Account-Saldo bis Monatsende (Zeit-Reise-korrekt)
-  // Spiegelt die Berechnung in SubAccountsSection: sub.initialBalance + group.initialBalance + Σ(entries)
-  const subAccountsData = await prisma.subAccount.findMany({
-    where: { accountId: id },
-    include: {
-      groups: {
-        include: {
-          entries: {
-            where: { date: { lte: endOfMonth } },
-            select: { amount: true },
-          },
-        },
-      },
-    },
-  })
-  const subAccountsBalance = subAccountsData.reduce((total, sa) =>
-    total + sa.initialBalance + sa.groups.reduce((gTotal, g) =>
-      gTotal + g.initialBalance + g.entries.reduce((eTotal, e) => eTotal + e.amount, 0)
-    , 0)
-  , 0)
+  // Sub-Accounts-Saldo: SUM(subAmount) from transactions up to end of month
+  const subBalanceRows = await prisma.$queryRaw<[{ total: number | null }]>`
+    SELECT SUM(COALESCE(subAmount, 0)) as total
+    FROM "Transaction"
+    WHERE accountId = ${id}
+      AND date <= ${endOfMonth}
+      AND subAmount IS NOT NULL
+  `
+  const subAccountsBalance = subBalanceRows[0]?.total ?? 0
 
   return NextResponse.json({
     account,

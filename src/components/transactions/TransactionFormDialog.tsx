@@ -24,7 +24,7 @@ const schema = z.object({
   payee: z.string().optional(),
   accountId: z.string().min(1, 'Konto erforderlich'),
   categoryId: z.string().optional(),
-  type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']),
+  mainType: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']),
   notes: z.string().optional(),
 })
 
@@ -88,13 +88,13 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
       payee: '',
       accountId: '',
       categoryId: '',
-      type: 'EXPENSE',
+      mainType: 'EXPENSE',
       notes: '',
     },
   })
 
   const watchedAccountId = form.watch('accountId')
-  const currentType = form.watch('type')
+  const currentType = form.watch('mainType')
 
   // Kategoriegruppen des gewählten Kontos laden
   const { data: categoryGroups = [] } = useQuery<CategoryGroup[]>({
@@ -107,14 +107,15 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
   useEffect(() => {
     if (!open) return
     if (editTransaction) {
+      const displayAmount = editTransaction.mainAmount != null ? editTransaction.mainAmount : (editTransaction.subAmount ?? 0)
       form.reset({
         date: format(new Date(editTransaction.date), 'yyyy-MM-dd'),
-        amount: Math.abs(editTransaction.amount),
+        amount: Math.abs(displayAmount),
         description: editTransaction.description,
         payee: editTransaction.payee ?? '',
         accountId: editTransaction.accountId,
         categoryId: editTransaction.categoryId ?? '',
-        type: editTransaction.type,
+        mainType: editTransaction.mainType,
         notes: editTransaction.notes ?? '',
       })
     } else if (defaultAccountId) {
@@ -153,7 +154,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
   const transferSubGroupCategories: Category[] = [] // Transfer-Kategorie über Sub-Account-Gruppen (bestehende Logik)
 
   function handleTypeChange(v: string) {
-    form.setValue('type', v as FormValues['type'])
+    form.setValue('mainType', v as FormValues['mainType'])
     setTransferTargetId('')
     setTransferGroupId('')
     setSelectedGroupId('')
@@ -167,15 +168,19 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
 
   const createMutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      const amount = values.type === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
+      const mainAmount = values.mainType === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...values,
-          amount,
-          categoryId: values.categoryId || null,
+          date: values.date,
+          mainAmount,
+          mainType: values.mainType,
+          description: values.description,
           payee: values.payee || null,
+          notes: values.notes || null,
+          accountId: values.accountId,
+          categoryId: values.categoryId || null,
         }),
       })
       if (!res.ok) throw new Error('Fehler')
@@ -193,13 +198,14 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
 
   const updateMutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      const amount = values.type === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
+      const mainAmount = values.mainType === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
       const res = await fetch(`/api/transactions/${editTransaction!.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           date: values.date,
-          amount,
+          mainAmount,
+          mainType: values.mainType,
           description: values.description,
           payee: values.payee || null,
           notes: values.notes || null,
@@ -224,7 +230,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
 
   function handleClose() {
     onOpenChange(false)
-    form.reset({ date: format(new Date(), 'yyyy-MM-dd'), type: 'EXPENSE', amount: 0 })
+    form.reset({ date: format(new Date(), 'yyyy-MM-dd'), mainType: 'EXPENSE', amount: 0 })
     setTransferTargetId('')
     setTransferGroupId('')
     setSelectedGroupId('')
@@ -240,7 +246,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
           <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
 
             {/* Typ */}
-            <FormField control={form.control} name="type" render={({ field }) => (
+            <FormField control={form.control} name="mainType" render={({ field }) => (
               <FormItem>
                 <FormLabel>Typ</FormLabel>
                 <Select

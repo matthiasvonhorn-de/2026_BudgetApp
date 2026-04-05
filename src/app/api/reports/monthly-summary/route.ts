@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
-import type { AccountType } from '@prisma/client'
 
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
@@ -17,23 +16,35 @@ export const GET = withHandler(async (request: Request) => {
     const startOfMonth = new Date(year, month - 1, 1)
     const endOfMonth = new Date(year, month, 0, 23, 59, 59)
 
-    const accountFilter = { isActive: true, type: { notIn: ['SPARPLAN', 'FESTGELD'] as AccountType[] } }
-    const [incomeResult, expenseResult] = await Promise.all([
-      prisma.transaction.aggregate({
-        where: { date: { gte: startOfMonth, lte: endOfMonth }, type: 'INCOME', account: accountFilter },
-        _sum: { amount: true },
-      }),
-      prisma.transaction.aggregate({
-        where: { date: { gte: startOfMonth, lte: endOfMonth }, type: 'EXPENSE', account: accountFilter },
-        _sum: { amount: true },
-      }),
+    const [incomeRows, expenseRows] = await Promise.all([
+      prisma.$queryRaw<[{ total: number | null }]>`
+        SELECT SUM(COALESCE(t.mainAmount, 0)) as total
+        FROM "Transaction" t
+        JOIN Account a ON t.accountId = a.id
+        WHERE t.date >= ${startOfMonth}
+          AND t.date <= ${endOfMonth}
+          AND t.mainType = 'INCOME'
+          AND t.mainAmount > 0
+          AND a.isActive = 1
+          AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+      `,
+      prisma.$queryRaw<[{ total: number | null }]>`
+        SELECT SUM(COALESCE(t.mainAmount, 0)) as total
+        FROM "Transaction" t
+        JOIN Account a ON t.accountId = a.id
+        WHERE t.date >= ${startOfMonth}
+          AND t.date <= ${endOfMonth}
+          AND t.mainType = 'EXPENSE'
+          AND a.isActive = 1
+          AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+      `,
     ])
 
     results.push({
       year,
       month,
-      income: incomeResult._sum.amount ?? 0,
-      expenses: Math.abs(expenseResult._sum.amount ?? 0),
+      income: incomeRows[0]?.total ?? 0,
+      expenses: Math.abs(expenseRows[0]?.total ?? 0),
     })
   }
 

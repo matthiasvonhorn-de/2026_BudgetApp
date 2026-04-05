@@ -15,12 +15,13 @@ export const POST = withHandler(async (request: Request, ctx) => {
       data: { status: 'RECONCILED', isReconciled: true },
     })
 
-    // Summe der abgeglichenen Transaktionen
-    const cleared = await tx.transaction.aggregate({
-      where: { accountId: id, isReconciled: true },
-      _sum: { amount: true },
-    })
-    const clearedBalance = cleared._sum.amount ?? 0
+    // Summe der abgeglichenen Transaktionen: SUM(mainAmount + subAmount)
+    const clearedRows = await tx.$queryRaw<[{ total: number | null }]>`
+      SELECT SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
+      FROM "Transaction"
+      WHERE accountId = ${id} AND isReconciled = 1
+    `
+    const clearedBalance = clearedRows[0]?.total ?? 0
     const difference = statementBalance - clearedBalance
 
     // Reconciliation-Eintrag erstellen

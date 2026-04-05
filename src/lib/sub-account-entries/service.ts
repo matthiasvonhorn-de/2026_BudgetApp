@@ -37,7 +37,10 @@ export async function createLinkedEntry(input: CreateLinkedEntryInput) {
     }
 
     const accountId = group.subAccount.accountId
-    const transactionAmount = -amount // inverted sign convention
+
+    // Sub-only transaction: mainAmount = null, subAmount = entry.amount
+    const subAmount = amount
+    const subType = subAmount >= 0 ? 'INCOME' : 'EXPENSE'
 
     // Create entry
     const entry = await tx.subAccountEntry.create({
@@ -50,24 +53,26 @@ export async function createLinkedEntry(input: CreateLinkedEntryInput) {
       },
     })
 
-    // Create linked transaction
+    // Create linked transaction (sub-only)
     const transaction = await tx.transaction.create({
       data: {
         date: new Date(date),
-        amount: transactionAmount,
+        mainAmount: null,
+        mainType: 'INCOME',
+        subAmount,
+        subType,
         description,
         accountId,
         categoryId,
-        type: transactionAmount > 0 ? 'INCOME' : 'EXPENSE',
         status: 'PENDING',
         subAccountEntryId: entry.id,
       },
     })
 
-    // Update account balance
+    // Update account balance: only subAmount contributes (mainAmount is null)
     await tx.account.update({
       where: { id: accountId },
-      data: { currentBalance: { increment: transaction.amount } },
+      data: { currentBalance: { increment: subAmount } },
     })
 
     return { entry, transaction }
@@ -94,9 +99,11 @@ export async function updateLinkedEntry(entryId: string, input: UpdateLinkedEntr
     if (!existing) throw new DomainError('Eintrag nicht gefunden', 404)
     if (!existing.transaction) throw new DomainError('Eintrag hat keine verknüpfte Transaktion', 400)
 
-    const oldTransactionAmount = existing.transaction.amount
+    const oldSubAmount = existing.transaction.subAmount ?? 0
+    const oldMainAmount = existing.transaction.mainAmount ?? 0
     const newEntryAmount = input.amount ?? existing.amount
-    const newTransactionAmount = -newEntryAmount
+    const newSubAmount = newEntryAmount
+    const newSubType = newSubAmount >= 0 ? 'INCOME' : 'EXPENSE'
     const newDate = input.date ? new Date(input.date) : existing.date
     const newDescription = input.description ?? existing.description
 
@@ -116,16 +123,17 @@ export async function updateLinkedEntry(entryId: string, input: UpdateLinkedEntr
       data: {
         date: newDate,
         description: newDescription,
-        amount: newTransactionAmount,
-        type: newTransactionAmount > 0 ? 'INCOME' : 'EXPENSE',
+        subAmount: newSubAmount,
+        subType: newSubType,
       },
     })
 
     // Update account balance if amount changed
-    if (input.amount !== undefined && newTransactionAmount !== oldTransactionAmount) {
+    if (input.amount !== undefined && newSubAmount !== oldSubAmount) {
+      const balanceDiff = (oldMainAmount + newSubAmount) - (oldMainAmount + oldSubAmount)
       await tx.account.update({
         where: { id: existing.group.subAccount.accountId },
-        data: { currentBalance: { increment: newTransactionAmount - oldTransactionAmount } },
+        data: { currentBalance: { increment: balanceDiff } },
       })
     }
 
@@ -148,11 +156,12 @@ export async function deleteLinkedEntry(entryId: string) {
 
     const accountId = existing.group.subAccount.accountId
 
-    // Reverse account balance (using transaction amount, not entry amount)
+    // Reverse account balance using total effect: -(mainAmount + subAmount)
     if (existing.transaction) {
+      const totalEffect = (existing.transaction.mainAmount ?? 0) + (existing.transaction.subAmount ?? 0)
       await tx.account.update({
         where: { id: accountId },
-        data: { currentBalance: { increment: -existing.transaction.amount } },
+        data: { currentBalance: { increment: -totalEffect } },
       })
       // Delete transaction first (holds FK to entry)
       await tx.transaction.delete({ where: { id: existing.transaction.id } })
@@ -167,7 +176,7 @@ export async function deleteLinkedEntry(entryId: string) {
 
 interface CreateEntryFromTransactionInput {
   transactionId: string
-  transactionAmount: number
+  transactionMainAmount: number
   date: Date
   description: string
   status: TransactionStatus
@@ -178,9 +187,13 @@ interface CreateEntryFromTransactionInput {
 }
 
 export async function createEntryFromTransaction(tx: TxClient, input: CreateEntryFromTransactionInput) {
-  const { transactionId, transactionAmount, date, description, status, categoryId, linkedGroupId, linkType, skipPairedTransfer } = input
+  const { transactionId, transactionMainAmount, date, description, status, categoryId, linkedGroupId, linkType, skipPairedTransfer } = input
 
-  const entryAmount = -transactionAmount
+  // subAmount = -mainAmount (allocation: main gives, sub receives)
+  const subAmount = -transactionMainAmount
+  const subType = subAmount >= 0 ? 'INCOME' : 'EXPENSE'
+  const entryAmount = subAmount
+
   const entry = await tx.subAccountEntry.create({
     data: {
       date,
@@ -193,7 +206,11 @@ export async function createEntryFromTransaction(tx: TxClient, input: CreateEntr
 
   await tx.transaction.update({
     where: { id: transactionId },
-    data: { subAccountEntryId: entry.id },
+    data: {
+      subAccountEntryId: entry.id,
+      subAmount,
+      subType,
+    },
   })
 
   let pairedTransactionId: string | null = null
@@ -205,16 +222,16 @@ export async function createEntryFromTransaction(tx: TxClient, input: CreateEntr
     })
     if (group) {
       const targetAccountId = group.subAccount.accountId
-      const pairedAmount = -transactionAmount
+      const pairedAmount = -transactionMainAmount
 
       const paired = await tx.transaction.create({
         data: {
           date,
-          amount: pairedAmount,
+          mainAmount: pairedAmount,
+          mainType: pairedAmount >= 0 ? 'INCOME' : 'EXPENSE',
           description,
           accountId: targetAccountId,
           categoryId,
-          type: 'TRANSFER',
           status,
         },
       })
@@ -237,8 +254,8 @@ export async function createEntryFromTransaction(tx: TxClient, input: CreateEntr
 }
 
 interface UpdateEntryFromTransactionInput {
-  newAmount: number
-  oldAmount: number
+  newMainAmount: number
+  oldMainAmount: number
   date: Date
   description: string
   newCategoryId: string | null
@@ -249,7 +266,7 @@ interface UpdateEntryFromTransactionInput {
 }
 
 export async function updateEntryFromTransaction(tx: TxClient, input: UpdateEntryFromTransactionInput) {
-  const { newAmount, oldAmount, date, description, newCategoryId, existingSubAccountEntryId, existingTransferId, existingStatus, transactionId } = input
+  const { newMainAmount, oldMainAmount, date, description, newCategoryId, existingSubAccountEntryId, existingTransferId, existingStatus, transactionId } = input
 
   // Resolve new category's sub-account group
   let newSubGroupId: string | null = null
@@ -267,29 +284,44 @@ export async function updateEntryFromTransaction(tx: TxClient, input: UpdateEntr
 
   // Sync sub-account entry
   if (hadEntry && newSubGroupId) {
+    // subAmount = -mainAmount, entry.amount = subAmount
+    const newSubAmount = -newMainAmount
+    const newSubType = newSubAmount >= 0 ? 'INCOME' : 'EXPENSE'
     await tx.subAccountEntry.update({
       where: { id: existingSubAccountEntryId! },
-      data: { date, description, amount: -newAmount, groupId: newSubGroupId },
+      data: { date, description, amount: newSubAmount, groupId: newSubGroupId },
+    })
+    await tx.transaction.update({
+      where: { id: transactionId },
+      data: { subAmount: newSubAmount, subType: newSubType },
     })
   } else if (hadEntry && !newSubGroupId) {
-    await tx.transaction.update({ where: { id: transactionId }, data: { subAccountEntryId: null } })
+    // Remove sub side
+    await tx.transaction.update({ where: { id: transactionId }, data: { subAccountEntryId: null, subAmount: null, subType: null } })
     await tx.subAccountEntry.delete({ where: { id: existingSubAccountEntryId! } })
   } else if (!hadEntry && newSubGroupId) {
+    // Add sub side
+    const newSubAmount = -newMainAmount
+    const newSubType = newSubAmount >= 0 ? 'INCOME' : 'EXPENSE'
     const entry = await tx.subAccountEntry.create({
-      data: { date, description, amount: -newAmount, fromBudget: true, groupId: newSubGroupId },
+      data: { date, description, amount: newSubAmount, fromBudget: true, groupId: newSubGroupId },
     })
-    await tx.transaction.update({ where: { id: transactionId }, data: { subAccountEntryId: entry.id } })
+    await tx.transaction.update({
+      where: { id: transactionId },
+      data: { subAccountEntryId: entry.id, subAmount: newSubAmount, subType: newSubType },
+    })
   }
 
   // Sync paired TRANSFER transaction
   if (existingTransferId) {
     const paired = await tx.transaction.findUnique({ where: { id: existingTransferId } })
     if (paired) {
-      const pairedDiff = -(newAmount - oldAmount)
-      if (newAmount !== oldAmount) {
+      const oldPairedMain = paired.mainAmount ?? 0
+      const newPairedMain = -newMainAmount
+      if (newPairedMain !== oldPairedMain) {
         await tx.account.update({
           where: { id: paired.accountId },
-          data: { currentBalance: { increment: pairedDiff } },
+          data: { currentBalance: { increment: newPairedMain - oldPairedMain } },
         })
       }
       await tx.transaction.update({
@@ -297,7 +329,8 @@ export async function updateEntryFromTransaction(tx: TxClient, input: UpdateEntr
         data: {
           date,
           description,
-          amount: -newAmount,
+          mainAmount: newPairedMain,
+          mainType: newPairedMain >= 0 ? 'INCOME' : 'EXPENSE',
         },
       })
     }
@@ -308,20 +341,21 @@ export async function updateEntryFromTransaction(tx: TxClient, input: UpdateEntr
     })
     if (group) {
       const targetAccountId = group.subAccount.accountId
+      const pairedMain = -newMainAmount
       const paired = await tx.transaction.create({
         data: {
           date,
-          amount: -newAmount,
+          mainAmount: pairedMain,
+          mainType: pairedMain >= 0 ? 'INCOME' : 'EXPENSE',
           description,
           accountId: targetAccountId,
           categoryId: newCategoryId,
-          type: 'TRANSFER',
           status: existingStatus,
         },
       })
       await tx.account.update({
         where: { id: targetAccountId },
-        data: { currentBalance: { increment: -newAmount } },
+        data: { currentBalance: { increment: pairedMain } },
       })
       await tx.transaction.update({ where: { id: transactionId }, data: { transferToId: paired.id } })
     }
@@ -333,7 +367,7 @@ export async function deleteEntryFromTransaction(tx: TxClient, subAccountEntryId
   // Unlink first (FK constraint), then delete
   await tx.transaction.updateMany({
     where: { subAccountEntryId },
-    data: { subAccountEntryId: null },
+    data: { subAccountEntryId: null, subAmount: null, subType: null },
   })
   await tx.subAccountEntry.delete({ where: { id: subAccountEntryId } })
 }

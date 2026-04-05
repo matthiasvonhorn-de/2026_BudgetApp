@@ -32,29 +32,33 @@ export const GET = withHandler(async (_, ctx) => {
 
   const accountFilter = { isActive: true, type: { notIn: ['SPARPLAN', 'FESTGELD'] as AccountType[] } }
 
-  // Alle Transaktionen dieses Monats aggregiert nach Kategorie
-  const activities = await prisma.transaction.groupBy({
-    by: ['categoryId'],
-    where: {
-      date: { gte: startOfMonth, lte: endOfMonth },
-      categoryId: { not: null },
-      account: accountFilter,
-    },
-    _sum: { amount: true },
-  })
-  const activityMap = new Map(activities.map(a => [a.categoryId!, a._sum.amount ?? 0]))
+  // Alle Transaktionen dieses Monats aggregiert nach Kategorie: SUM(mainAmount + subAmount)
+  const activityRows = await prisma.$queryRaw<Array<{ categoryId: string; total: number }>>`
+    SELECT t.categoryId, SUM(COALESCE(t.mainAmount, 0) + COALESCE(t.subAmount, 0)) as total
+    FROM "Transaction" t
+    JOIN Account a ON t.accountId = a.id
+    WHERE t.date >= ${startOfMonth}
+      AND t.date <= ${endOfMonth}
+      AND t.categoryId IS NOT NULL
+      AND a.isActive = 1
+      AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+    GROUP BY t.categoryId
+  `
+  const activityMap = new Map(activityRows.map(a => [a.categoryId, a.total]))
 
-  // Gesamteinnahmen dieses Monats (für readyToAssign)
-  const incomeResult = await prisma.transaction.aggregate({
-    where: {
-      date: { gte: startOfMonth, lte: endOfMonth },
-      amount: { gt: 0 },
-      type: 'INCOME',
-      account: accountFilter,
-    },
-    _sum: { amount: true },
-  })
-  const totalIncome = incomeResult._sum.amount ?? 0
+  // Gesamteinnahmen dieses Monats (für readyToAssign): SUM(mainAmount) where mainType = INCOME
+  const incomeRows = await prisma.$queryRaw<[{ total: number | null }]>`
+    SELECT SUM(COALESCE(t.mainAmount, 0)) as total
+    FROM "Transaction" t
+    JOIN Account a ON t.accountId = a.id
+    WHERE t.date >= ${startOfMonth}
+      AND t.date <= ${endOfMonth}
+      AND t.mainAmount > 0
+      AND t.mainType = 'INCOME'
+      AND a.isActive = 1
+      AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+  `
+  const totalIncome = incomeRows[0]?.total ?? 0
 
   // Daten zusammenführen
   let totalBudgeted = 0
@@ -68,13 +72,6 @@ export const GET = withHandler(async (_, ctx) => {
       const budgeted = entry?.budgeted ?? 0
       const rolledOver = entry?.rolledOver ?? 0
       const activity = activityMap.get(cat.id) ?? 0
-      // available = what's left in the envelope after planning and spending.
-      // Sign convention: expenses are stored as negative (e.g. budgeted = -600),
-      // activity is also negative for expenses (e.g. -400 spent).
-      // Remaining budget = |budgeted| - |activity|
-      //   = activity - budgeted  (because both are negative, subtracting gives the right sign)
-      // With rollover: available = rolledOver + activity - budgeted
-      // Example: rolledOver=0, budgeted=-600, activity=-400 → available = 0 + (-400) - (-600) = 200 ✓
       const available = rolledOver + activity - budgeted
 
       if (cat.type === 'EXPENSE') {
@@ -93,9 +90,6 @@ export const GET = withHandler(async (_, ctx) => {
     }),
   }))
 
-  // totalBudgeted is negative (sum of expense budgets, e.g. -600).
-  // readyToAssign = income not yet allocated to expense categories.
-  // = totalIncome + totalBudgeted  (e.g. 1000 + (-600) = 400 remaining to assign)
   const readyToAssign = totalIncome + totalBudgeted
 
   return NextResponse.json({

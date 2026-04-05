@@ -66,14 +66,16 @@ export interface CategoryGroup {
 export interface Transaction {
   id: string
   date: string
-  amount: number
+  mainAmount: number | null
+  mainType: TransactionType
+  subAmount: number | null
+  subType: TransactionType | null
   description: string
   payee: string | null
   notes: string | null
   accountId: string
   categoryId: string | null
   status: TransactionStatus
-  type: TransactionType
   importHash: string | null
   isReconciled: boolean
   subAccountEntryId: string | null

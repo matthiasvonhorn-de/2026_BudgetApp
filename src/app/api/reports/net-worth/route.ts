@@ -18,15 +18,22 @@ export const GET = withHandler(async (request: Request) => {
     select: { id: true, currentBalance: true },
   })
 
-  const futureTransactions = await prisma.transaction.groupBy({
-    by: ['accountId'],
-    where: {
-      accountId: { in: accounts.map(a => a.id) },
-      date: { gt: endOfMonth },
-    },
-    _sum: { amount: true },
-  })
-  const futureMap = new Map(futureTransactions.map(t => [t.accountId, t._sum.amount ?? 0]))
+  const accountIds = accounts.map(a => a.id)
+  let futureRows: Array<{ accountId: string; total: number }> = []
+  if (accountIds.length > 0) {
+    const placeholders = accountIds.map(() => '?').join(',')
+    futureRows = await prisma.$queryRawUnsafe<Array<{ accountId: string; total: number }>>(
+      `SELECT accountId, SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
+       FROM "Transaction"
+       WHERE accountId IN (${placeholders})
+         AND date > ?
+       GROUP BY accountId`,
+      ...accountIds,
+      endOfMonth,
+    ).catch(() => [] as Array<{ accountId: string; total: number }>)
+  }
+
+  const futureMap = new Map(futureRows.map(t => [t.accountId, t.total]))
 
   const totalAssets = accounts.reduce(
     (sum, a) => sum + a.currentBalance - (futureMap.get(a.id) ?? 0),
@@ -34,8 +41,6 @@ export const GET = withHandler(async (request: Request) => {
   )
 
   // 2. Loan balances at end of month:
-  //    For each active loan, find the scheduled balance at the last payment row <= endOfMonth.
-  //    If no payment row exists yet, use the principal.
   const loans = await prisma.loan.findMany({
     where: { isActive: true },
     select: {
@@ -52,7 +57,6 @@ export const GET = withHandler(async (request: Request) => {
   })
 
   const totalDebts = loans.reduce((sum, loan) => {
-    // Loan not started yet in this month
     if (loan.startDate > endOfMonth) return sum
     const remaining = loan.payments[0]?.scheduledBalance ?? loan.principal
     return sum + remaining

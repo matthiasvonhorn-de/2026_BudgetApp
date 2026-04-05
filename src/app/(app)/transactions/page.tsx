@@ -117,7 +117,7 @@ export default function TransactionsPage() {
         if (changes.date !== undefined) body.date = changes.date
         if (changes.description !== undefined) body.description = changes.description
         if (changes.amount !== undefined) {
-          body.amount = original.type === 'INCOME' ? Math.abs(changes.amount) : -Math.abs(changes.amount)
+          body.mainAmount = original.mainType === 'INCOME' ? Math.abs(changes.amount) : -Math.abs(changes.amount)
         }
         if (changes.accountId !== undefined) body.accountId = changes.accountId
         if (changes.categoryId !== undefined) body.categoryId = changes.categoryId || null
@@ -242,7 +242,8 @@ export default function TransactionsPage() {
 
                 const currentDate = rowChanges?.date ?? format(new Date(t.date), 'yyyy-MM-dd')
                 const currentDesc = rowChanges?.description ?? t.description
-                const currentAmount = rowChanges?.amount ?? Math.abs(t.amount)
+                const displayAmount = t.mainAmount != null ? t.mainAmount : (t.subAmount ?? 0)
+                const currentAmount = rowChanges?.amount ?? Math.abs(displayAmount)
 
                 function updateRow(field: string, value: unknown) {
                   setEditingRows(prev => ({
@@ -312,9 +313,14 @@ export default function TransactionsPage() {
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </td>
-                  <td className={`p-3 text-right font-semibold whitespace-nowrap ${t.amount < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                    {fmt(t.amount)}
-                  </td>
+                  {(() => {
+                    const displayAmt = t.mainAmount != null ? t.mainAmount : (t.subAmount ?? 0)
+                    return (
+                      <td className={`p-3 text-right font-semibold whitespace-nowrap ${displayAmt < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                        {fmt(displayAmt)}
+                      </td>
+                    )
+                  })()}
                   <td className="p-3">
                     <div className="flex items-center gap-1 justify-end">
                       <Button

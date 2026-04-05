@@ -26,13 +26,13 @@ export const POST = withHandler(async (request: Request) => {
     const created = await tx.transaction.createMany({
       data: toImport.map(t => ({
         date: new Date(t.date),
-        amount: t.amount,
+        mainAmount: t.amount,
+        mainType: t.amount >= 0 ? 'INCOME' : 'EXPENSE',
         description: t.description,
         payee: t.payee || null,
         categoryId: t.categoryId || null,
         accountId,
         importHash: t.hash,
-        type: t.amount >= 0 ? 'INCOME' : 'EXPENSE',
         status: 'CLEARED',
       })),
     })

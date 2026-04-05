@@ -89,31 +89,43 @@ export const POST = withHandler(async (request: Request) => {
     const linkType = category?.subAccountLinkType ?? 'BOOKING'
 
     // For TRANSFER link type, override the transaction type
-    const txType = linkedGroup && linkType === 'TRANSFER' && !data.skipSubAccountEntry ? 'TRANSFER' : data.type
+    const txMainType = linkedGroup && linkType === 'TRANSFER' && !data.skipSubAccountEntry
+      ? 'TRANSFER'
+      : data.mainType
 
     // Create source transaction
     const { skipSubAccountEntry: _skip1, skipPairedTransfer: _skip2, ...txData } = data
     const t = await tx.transaction.create({
       data: {
-        ...txData,
-        type: txType,
         date: new Date(data.date),
+        mainAmount: txData.mainAmount ?? null,
+        mainType: txMainType,
+        subAmount: txData.subAmount ?? null,
+        subType: txData.subType ?? null,
+        description: txData.description,
+        payee: txData.payee || null,
+        notes: txData.notes || null,
+        accountId: txData.accountId,
         categoryId: data.categoryId || null,
+        status: txData.status ?? 'PENDING',
       },
       include: { account: true, category: true },
     })
 
-    // Update source account balance
-    await tx.account.update({
-      where: { id: data.accountId },
-      data: { currentBalance: { increment: data.amount } },
-    })
+    // Update source account balance: mainAmount + subAmount
+    const balanceIncrement = (data.mainAmount ?? 0) + (data.subAmount ?? 0)
+    if (balanceIncrement !== 0) {
+      await tx.account.update({
+        where: { id: data.accountId },
+        data: { currentBalance: { increment: balanceIncrement } },
+      })
+    }
 
     // Delegate entry + TRANSFER pair creation to service layer
-    if (linkedGroup && !data.skipSubAccountEntry) {
+    if (linkedGroup && !data.skipSubAccountEntry && data.mainAmount != null) {
       const result = await createEntryFromTransaction(tx, {
         transactionId: t.id,
-        transactionAmount: data.amount,
+        transactionMainAmount: data.mainAmount,
         date: new Date(data.date),
         description: data.description,
         status: (data.status ?? 'PENDING') as any,
@@ -123,9 +135,18 @@ export const POST = withHandler(async (request: Request) => {
         skipPairedTransfer: data.skipPairedTransfer,
       })
 
+      // createEntryFromTransaction sets subAmount on the transaction, recalculate balance
+      const subAmount = -data.mainAmount
+      await tx.account.update({
+        where: { id: data.accountId },
+        data: { currentBalance: { increment: subAmount } },
+      })
+
       return {
         ...t,
         subAccountEntryId: result.entry.id,
+        subAmount,
+        subType: subAmount >= 0 ? 'INCOME' : 'EXPENSE',
         ...(result.pairedTransactionId && { transferToId: result.pairedTransactionId }),
       }
     }
