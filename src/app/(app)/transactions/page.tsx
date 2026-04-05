@@ -88,6 +88,7 @@ export default function TransactionsPage() {
       fetch(`/api/transactions/${id}?revertLoan=${revertLoan}`, { method: 'DELETE' }).then(r => r.json()),
     onSuccess: (_, { revertLoan }) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['account-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
       if (revertLoan) queryClient.invalidateQueries({ queryKey: ['loans'] })
