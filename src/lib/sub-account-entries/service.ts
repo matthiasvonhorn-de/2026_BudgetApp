@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { DomainError } from '@/lib/api/errors'
 
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 interface CreateLinkedEntryInput {
   groupId: string
   categoryId: string
@@ -66,6 +68,65 @@ export async function createLinkedEntry(input: CreateLinkedEntryInput) {
       where: { id: accountId },
       data: { currentBalance: { increment: transactionAmount } },
     })
+
+    return { entry, transaction }
+  })
+}
+
+// ── Task 2 ─────────────────────────────────────────────────────────────────
+
+interface UpdateLinkedEntryInput {
+  date?: string
+  description?: string
+  amount?: number
+}
+
+export async function updateLinkedEntry(entryId: string, input: UpdateLinkedEntryInput) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.subAccountEntry.findUnique({
+      where: { id: entryId },
+      include: {
+        transaction: true,
+        group: { include: { subAccount: true } },
+      },
+    })
+    if (!existing) throw new DomainError('Eintrag nicht gefunden', 404)
+    if (!existing.transaction) throw new DomainError('Eintrag hat keine verknüpfte Transaktion', 400)
+
+    const oldTransactionAmount = existing.transaction.amount
+    const newEntryAmount = input.amount ?? existing.amount
+    const newTransactionAmount = -newEntryAmount
+    const newDate = input.date ? new Date(input.date) : existing.date
+    const newDescription = input.description ?? existing.description
+
+    // Update entry
+    const entry = await tx.subAccountEntry.update({
+      where: { id: entryId },
+      data: {
+        ...(input.date && { date: newDate }),
+        ...(input.description !== undefined && { description: newDescription }),
+        ...(input.amount !== undefined && { amount: newEntryAmount }),
+      },
+    })
+
+    // Update linked transaction
+    const transaction = await tx.transaction.update({
+      where: { id: existing.transaction.id },
+      data: {
+        date: newDate,
+        description: newDescription,
+        amount: newTransactionAmount,
+        type: newTransactionAmount > 0 ? 'INCOME' : 'EXPENSE',
+      },
+    })
+
+    // Update account balance if amount changed
+    if (input.amount !== undefined && newTransactionAmount !== oldTransactionAmount) {
+      await tx.account.update({
+        where: { id: existing.group.subAccount.accountId },
+        data: { currentBalance: { increment: newTransactionAmount - oldTransactionAmount } },
+      })
+    }
 
     return { entry, transaction }
   })
