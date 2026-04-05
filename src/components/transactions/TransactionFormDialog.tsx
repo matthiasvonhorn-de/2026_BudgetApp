@@ -122,11 +122,24 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     }
   }, [open, editTransaction, defaultAccountId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Wenn Konto wechselt: Gruppe und Kategorie zurücksetzen
+  // Wenn Konto wechselt: Gruppe und Kategorie zurücksetzen (nur im Create-Modus)
   useEffect(() => {
+    if (editTransaction) return // Im Edit-Modus nicht zurücksetzen — der Prefill-Effect übernimmt
     setSelectedGroupId('')
     form.setValue('categoryId', '')
   }, [watchedAccountId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Im Edit-Modus: Gruppe und Kategorie setzen, sobald categoryGroups geladen sind
+  useEffect(() => {
+    if (!editTransaction || !categoryGroups.length) return
+    const categoryId = editTransaction.categoryId
+    if (!categoryId) return
+    const group = categoryGroups.find(g => g.categories.some(c => c.id === categoryId))
+    if (group) {
+      setSelectedGroupId(group.id)
+      form.setValue('categoryId', categoryId)
+    }
+  }, [editTransaction, categoryGroups]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kategorien der ausgewählten Gruppe
   const groupCategories = selectedGroupId
