@@ -51,8 +51,8 @@ Alle Salden werden direkt aus den Transaction-Feldern berechnet:
 ### Budget-Ansicht
 
 Die Budget-Tabelle zeigt Kategorie-Aktivitaet getrennt:
-- `mainAmount` fliesst in die Hauptkonto-Kategorie-Zeile
-- `subAmount` fliesst in eine separate Unterkonto-Kategorie-Zeile
+- `mainAmount` fliesst in die Kategorie-Aktivitaet der Budget-Tabelle
+- `subAmount` fliesst NICHT in die Budget-Tabelle, sondern wird auf dem Tab "Unterkonten" in der entsprechenden Gruppe angezeigt
 - `closingActual` = `SUM(alle mainAmount) + SUM(alle subAmount)` bis Monatsende
 - Gesamtsaldo = closingActual (keine Addition von subAccountsBalance noetig, da subAmount bereits enthalten)
 
