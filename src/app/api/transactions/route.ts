@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { createTransactionSchema } from '@/lib/schemas/transactions'
 import { createEntryFromTransaction } from '@/lib/sub-account-entries/service'
-import { balanceIncrement } from '@/lib/money'
+import { balanceIncrement, roundCents } from '@/lib/money'
 
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
@@ -125,6 +125,132 @@ export const POST = withHandler(async (request: Request) => {
         where: { id: data.accountId },
         data: { currentBalance: balanceIncrement(balanceDelta) },
       })
+    }
+
+    // === NEW TRANSFER HANDLING ===
+    if (data.transferTargetAccountId && data.sourceType && data.transferTargetType) {
+      const amount = roundCents(Math.abs(data.mainAmount ?? data.subAmount ?? 0))
+
+      // Source side
+      const srcMain = data.sourceType === 'MAIN' ? -amount : null
+      const srcMainType = data.sourceType === 'MAIN' ? 'EXPENSE' as const : 'INCOME' as const
+      const srcSub = data.sourceType === 'SUB' ? -amount : null
+      const srcSubType = data.sourceType === 'SUB' ? 'EXPENSE' as const : null
+
+      // Determine source categoryId
+      let srcCategoryId = data.sourceCategoryId || data.categoryId || null
+      if (data.sourceType === 'SUB' && data.sourceGroupId && !srcCategoryId) {
+        const srcCat = await tx.category.findFirst({
+          where: { subAccountGroupId: data.sourceGroupId, groupId: { not: null } },
+          orderBy: { id: 'asc' },
+          select: { id: true },
+        })
+        srcCategoryId = srcCat?.id ?? null
+      }
+
+      // Update source transaction
+      await tx.transaction.update({
+        where: { id: t.id },
+        data: {
+          mainAmount: srcMain,
+          mainType: srcMainType,
+          subAmount: srcSub,
+          subType: srcSubType,
+          categoryId: srcCategoryId,
+        },
+      })
+
+      // Source sub-account entry
+      if (data.sourceType === 'SUB' && data.sourceGroupId) {
+        const srcEntry = await tx.subAccountEntry.create({
+          data: {
+            date: new Date(data.date),
+            description: data.description,
+            amount: srcSub!,
+            fromBudget: false,
+            groupId: data.sourceGroupId,
+          },
+        })
+        await tx.transaction.update({
+          where: { id: t.id },
+          data: { subAccountEntryId: srcEntry.id },
+        })
+      }
+
+      // Fix source balance (initial update used raw data, we need correct values)
+      const initialDelta = (data.mainAmount ?? 0) + (data.subAmount ?? 0)
+      const correctSrcDelta = (srcMain ?? 0) + (srcSub ?? 0)
+      if (initialDelta !== correctSrcDelta) {
+        await tx.account.update({
+          where: { id: data.accountId },
+          data: { currentBalance: balanceIncrement(correctSrcDelta - initialDelta) },
+        })
+      }
+
+      // Target side
+      const tgtMain = data.transferTargetType === 'MAIN' ? amount : null
+      const tgtMainType = 'INCOME' as const
+      const tgtSub = data.transferTargetType === 'SUB' ? amount : null
+      const tgtSubType = data.transferTargetType === 'SUB' ? 'INCOME' as const : null
+
+      // Determine target categoryId
+      let tgtCategoryId = data.transferTargetCategoryId || null
+      if (data.transferTargetType === 'SUB' && data.transferTargetGroupId && !tgtCategoryId) {
+        const tgtCat = await tx.category.findFirst({
+          where: { subAccountGroupId: data.transferTargetGroupId, groupId: { not: null } },
+          orderBy: { id: 'asc' },
+          select: { id: true },
+        })
+        tgtCategoryId = tgtCat?.id ?? null
+      }
+
+      const paired = await tx.transaction.create({
+        data: {
+          date: new Date(data.date),
+          mainAmount: tgtMain,
+          mainType: tgtMainType,
+          subAmount: tgtSub,
+          subType: tgtSubType,
+          description: data.description,
+          accountId: data.transferTargetAccountId,
+          categoryId: tgtCategoryId,
+          status: data.status ?? 'PENDING',
+        },
+      })
+
+      // Target sub-account entry
+      if (data.transferTargetType === 'SUB' && data.transferTargetGroupId) {
+        const tgtEntry = await tx.subAccountEntry.create({
+          data: {
+            date: new Date(data.date),
+            description: data.description,
+            amount: tgtSub!,
+            fromBudget: false,
+            groupId: data.transferTargetGroupId,
+          },
+        })
+        await tx.transaction.update({
+          where: { id: paired.id },
+          data: { subAccountEntryId: tgtEntry.id },
+        })
+      }
+
+      // Link pair
+      await tx.transaction.update({
+        where: { id: t.id },
+        data: { transferToId: paired.id },
+      })
+
+      // Target balance
+      const tgtDelta = (tgtMain ?? 0) + (tgtSub ?? 0)
+      if (tgtDelta !== 0) {
+        await tx.account.update({
+          where: { id: data.transferTargetAccountId },
+          data: { currentBalance: balanceIncrement(tgtDelta) },
+        })
+      }
+
+      return { ...t, mainAmount: srcMain, mainType: srcMainType, subAmount: srcSub, subType: srcSubType, transferToId: paired.id }
     }
 
     // Delegate entry + TRANSFER pair creation to service layer
