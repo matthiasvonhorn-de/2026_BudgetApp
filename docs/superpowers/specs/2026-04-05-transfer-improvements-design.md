@@ -135,6 +135,31 @@ Der POST-Handler muss erweitert werden fuer die neuen Transfer-Kombinationen:
    - Von Konto: `balanceIncrement(-(mainAmount ?? 0) - (subAmount ?? 0))`
    - Auf Konto: `balanceIncrement((targetMainAmount ?? 0) + (targetSubAmount ?? 0))`
 
+## Loeschen und Bearbeiten von Umbuchungen
+
+### Loeschen
+
+Wenn eine der beiden verknuepften Transfer-Transaktionen geloescht wird (× Button), werden **immer beide** Transaktionen geloescht:
+- Beide Transaktionen entfernen
+- Verknuepfte SubAccountEntries entfernen (falls vorhanden)
+- Balance beider Konten korrigieren
+
+Dies ist bereits im bestehenden DELETE-Handler implementiert (ueber `transferToId`-Verknuepfung).
+
+### Bearbeiten
+
+Bei Transaktionen vom Typ Umbuchung darf **nur der Betrag** geaendert werden. Alle anderen Felder (Konto, Kategorie, Gruppe, Datum, Beschreibung) sind **read-only** im Edit-Dialog.
+
+Wenn der Betrag geaendert wird:
+- Beide Transaktionen werden aktualisiert (Quelle und Ziel)
+- Verknuepfte SubAccountEntries werden synchronisiert
+- Balance beider Konten wird angepasst
+
+Der Edit-Dialog erkennt eine Umbuchung (`transferToId != null`) und zeigt:
+- Alle Felder als read-only (Konten, Kategorien, Gruppen)
+- Nur Betrag editierbar
+- Speichern aktualisiert beide Transaktionen
+
 ## Betroffene Dateien
 
 ### Zu aendernde Dateien
