@@ -131,3 +131,33 @@ export async function updateLinkedEntry(entryId: string, input: UpdateLinkedEntr
     return { entry, transaction }
   })
 }
+
+// ── Task 3 ─────────────────────────────────────────────────────────────────
+
+export async function deleteLinkedEntry(entryId: string) {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.subAccountEntry.findUnique({
+      where: { id: entryId },
+      include: {
+        transaction: true,
+        group: { include: { subAccount: true } },
+      },
+    })
+    if (!existing) throw new DomainError('Eintrag nicht gefunden', 404)
+
+    const accountId = existing.group.subAccount.accountId
+
+    // Reverse account balance (using transaction amount, not entry amount)
+    if (existing.transaction) {
+      await tx.account.update({
+        where: { id: accountId },
+        data: { currentBalance: { increment: -existing.transaction.amount } },
+      })
+      // Delete transaction first (holds FK to entry)
+      await tx.transaction.delete({ where: { id: existing.transaction.id } })
+    }
+
+    // Delete entry
+    await tx.subAccountEntry.delete({ where: { id: entryId } })
+  })
+}
