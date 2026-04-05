@@ -79,12 +79,10 @@ export const GET = withHandler(async (request: Request) => {
     0,
   )
 
-  const totalAssetsWithPortfolios = totalAssets + totalPortfolios
-
   return NextResponse.json({
-    totalAssets: roundCents(totalAssetsWithPortfolios),
-    totalDebts: roundCents(totalDebts),
+    totalAssets: roundCents(totalAssets),
     totalPortfolios: roundCents(totalPortfolios),
-    netWorth: roundCents(totalAssetsWithPortfolios - totalDebts),
+    totalDebts: roundCents(totalDebts),
+    netWorth: roundCents(totalAssets + totalPortfolios - totalDebts),
   })
 })
