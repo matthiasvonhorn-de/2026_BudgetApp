@@ -22,6 +22,7 @@ export const GET = withHandler(async (_, ctx) => {
       accountId: id,
       date: { lt: startOfMonth },
       categoryId: { not: null },
+      subAccountEntryId: null,
     },
     _sum: { amount: true },
   })
@@ -50,6 +51,7 @@ export const GET = withHandler(async (_, ctx) => {
       accountId: id,
       date: { gte: startOfMonth, lte: endOfMonth },
       categoryId: { not: null },
+      subAccountEntryId: null,
     },
     _sum: { amount: true },
   })
