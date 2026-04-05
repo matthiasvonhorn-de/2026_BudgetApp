@@ -426,6 +426,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                     <Select
                       onValueChange={(v) => handleGroupChange(v === '__none__' ? '' : (v ?? ''))}
                       value={selectedGroupId || '__none__'}
+                      items={[{ value: '__none__', label: '— Keine Gruppe —' }, ...categoryGroups.map(g => ({ value: g.id, label: g.name }))]}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Gruppe wählen" />
@@ -448,6 +449,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                       <Select
                         onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
                         value={field.value || '__none__'}
+                        items={[{ value: '__none__', label: '— Keine Kategorie —' }, ...groupCategories.map(c => ({ value: c.id, label: c.name }))]}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Kategorie wählen" />
