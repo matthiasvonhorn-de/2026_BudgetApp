@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { createTransactionSchema } from '@/lib/schemas/transactions'
+import { createEntryFromTransaction } from '@/lib/sub-account-entries/service'
 
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
@@ -108,56 +109,25 @@ export const POST = withHandler(async (request: Request) => {
       data: { currentBalance: { increment: data.amount } },
     })
 
+    // Delegate entry + TRANSFER pair creation to service layer
     if (linkedGroup && !data.skipSubAccountEntry) {
-      // Sub-account entry: expense on main account → income in sub-account
-      const entryAmount = -data.amount
-      const entry = await tx.subAccountEntry.create({
-        data: {
-          date: new Date(data.date),
-          description: data.description,
-          amount: entryAmount,
-          fromBudget: true,
-          groupId: linkedGroup.id,
-        },
-      })
-      await tx.transaction.update({
-        where: { id: t.id },
-        data: { subAccountEntryId: entry.id },
+      const result = await createEntryFromTransaction(tx, {
+        transactionId: t.id,
+        transactionAmount: data.amount,
+        date: new Date(data.date),
+        description: data.description,
+        status: (data.status ?? 'PENDING') as any,
+        categoryId: data.categoryId || null,
+        linkedGroupId: linkedGroup.id,
+        linkType,
+        skipPairedTransfer: data.skipPairedTransfer,
       })
 
-      if (linkType === 'TRANSFER' && !data.skipPairedTransfer) {
-        // Create paired TRANSFER transaction on the target account
-        const targetAccountId = linkedGroup.subAccount.accountId
-        const pairedAmount = -data.amount  // opposite sign
-
-        const paired = await tx.transaction.create({
-          data: {
-            date: new Date(data.date),
-            amount: pairedAmount,
-            description: data.description,
-            accountId: targetAccountId,
-            categoryId: data.categoryId || null,
-            type: 'TRANSFER',
-            status: data.status,
-          },
-        })
-
-        // Update target account balance
-        await tx.account.update({
-          where: { id: targetAccountId },
-          data: { currentBalance: { increment: pairedAmount } },
-        })
-
-        // Link both transactions as a transfer pair
-        await tx.transaction.update({
-          where: { id: t.id },
-          data: { transferToId: paired.id },
-        })
-
-        return { ...t, transferToId: paired.id, subAccountEntryId: entry.id }
+      return {
+        ...t,
+        subAccountEntryId: result.entry.id,
+        ...(result.pairedTransactionId && { transferToId: result.pairedTransactionId }),
       }
-
-      return { ...t, subAccountEntryId: entry.id }
     }
 
     return t
