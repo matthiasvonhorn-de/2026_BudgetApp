@@ -68,6 +68,15 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
   const [transferGroupId, setTransferGroupId] = useState('')
   const [selectedGroupId, setSelectedGroupId] = useState('')
 
+  // Transfer-specific state
+  const [sourceType, setSourceType] = useState<'MAIN' | 'SUB'>('MAIN')
+  const [targetType, setTargetType] = useState<'MAIN' | 'SUB'>('MAIN')
+  const [sourceSubGroupId, setSourceSubGroupId] = useState('')
+  const [sourceCatGroupId, setSourceCatGroupId] = useState('')
+  const [sourceCategoryId, setSourceCategoryId] = useState('')
+  const [targetCatGroupId, setTargetCatGroupId] = useState('')
+  const [targetCategoryId, setTargetCategoryId] = useState('')
+
   const { data: accounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
@@ -101,6 +110,20 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     queryKey: ['category-groups', watchedAccountId],
     queryFn: () => fetch(`/api/category-groups?accountId=${watchedAccountId}`).then(r => r.json()),
     enabled: !!watchedAccountId && currentType !== 'TRANSFER',
+  })
+
+  // Transfer: Kategoriegruppen des Quellkontos
+  const { data: sourceCategoryGroups = [] } = useQuery<CategoryGroup[]>({
+    queryKey: ['category-groups', watchedAccountId],
+    queryFn: () => fetch(`/api/category-groups?accountId=${watchedAccountId}`).then(r => r.json()),
+    enabled: !!watchedAccountId && currentType === 'TRANSFER' && sourceType === 'MAIN',
+  })
+
+  // Transfer: Kategoriegruppen des Zielkontos
+  const { data: targetCategoryGroups = [] } = useQuery<CategoryGroup[]>({
+    queryKey: ['category-groups', transferTargetId],
+    queryFn: () => fetch(`/api/category-groups?accountId=${transferTargetId}`).then(r => r.json()),
+    enabled: !!transferTargetId && currentType === 'TRANSFER' && targetType === 'MAIN',
   })
 
   // Wenn Dialog öffnet: Transaktion vorbelegen (Edit) oder Standard-Konto setzen (Create)
@@ -147,11 +170,28 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     ? (categoryGroups.find(g => g.id === selectedGroupId)?.categories ?? [])
     : []
 
+  // Transfer: Sub-Account-Gruppen des Quellkontos
+  const sourceAccountSubGroups = subAccountGroups.filter(
+    g => g.subAccount.account.id === watchedAccountId,
+  )
+
+  // Transfer: Kategorien der gewählten Quell-Gruppe
+  const sourceCatGroupCategories = sourceCatGroupId
+    ? (sourceCategoryGroups.find(g => g.id === sourceCatGroupId)?.categories ?? [])
+    : []
+
+  // Transfer: Kategorien der gewählten Ziel-Gruppe
+  const targetCatGroupCategories = targetCatGroupId
+    ? (targetCategoryGroups.find(g => g.id === targetCatGroupId)?.categories ?? [])
+    : []
+
   // Für Transfer: Sub-Account-Gruppen des Zielkontos
   const targetAccountSubGroups = subAccountGroups.filter(
     g => g.subAccount.account.id === transferTargetId,
   )
-  const transferSubGroupCategories: Category[] = [] // Transfer-Kategorie über Sub-Account-Gruppen (bestehende Logik)
+
+  // Same-Account-Check for transfer
+  const isSameAccountTransfer = watchedAccountId && transferTargetId && watchedAccountId === transferTargetId
 
   function handleTypeChange(v: string) {
     form.setValue('mainType', v as FormValues['mainType'])
@@ -159,6 +199,14 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     setTransferGroupId('')
     setSelectedGroupId('')
     form.setValue('categoryId', '')
+    // Reset transfer-specific state
+    setSourceType('MAIN')
+    setTargetType('MAIN')
+    setSourceSubGroupId('')
+    setSourceCatGroupId('')
+    setSourceCategoryId('')
+    setTargetCatGroupId('')
+    setTargetCategoryId('')
   }
 
   function handleGroupChange(groupId: string) {
@@ -168,6 +216,34 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
 
   const createMutation = useMutation({
     mutationFn: async (values: FormValues) => {
+      if (values.mainType === 'TRANSFER') {
+        // Transfer: build payload for new transfer handling
+        const amount = Math.abs(values.amount)
+        const res = await fetch('/api/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            date: values.date,
+            mainAmount: sourceType === 'MAIN' ? -amount : null,
+            mainType: sourceType === 'MAIN' ? 'EXPENSE' : 'INCOME',
+            subAmount: sourceType === 'SUB' ? -amount : null,
+            subType: sourceType === 'SUB' ? 'EXPENSE' : null,
+            description: values.description,
+            accountId: values.accountId,
+            categoryId: sourceType === 'MAIN' ? sourceCategoryId || null : null,
+            sourceType,
+            sourceGroupId: sourceType === 'SUB' ? sourceSubGroupId : undefined,
+            sourceCategoryId: sourceType === 'MAIN' ? sourceCategoryId : undefined,
+            transferTargetAccountId: transferTargetId,
+            transferTargetType: targetType,
+            transferTargetCategoryId: targetType === 'MAIN' ? targetCategoryId : undefined,
+            transferTargetGroupId: targetType === 'SUB' ? transferGroupId : undefined,
+          }),
+        })
+        if (!res.ok) throw new Error('Fehler')
+        return res.json()
+      }
+
       const mainAmount = values.mainType === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
       const res = await fetch('/api/transactions', {
         method: 'POST',
@@ -256,6 +332,14 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     setTransferTargetId('')
     setTransferGroupId('')
     setSelectedGroupId('')
+    // Reset transfer-specific state
+    setSourceType('MAIN')
+    setTargetType('MAIN')
+    setSourceSubGroupId('')
+    setSourceCatGroupId('')
+    setSourceCategoryId('')
+    setTargetCatGroupId('')
+    setTargetCategoryId('')
   }
 
   // Erkennung: Ist das eine Sub-Account-TX (nur Unterkonto, kein Hauptkonto)?
@@ -357,101 +441,296 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                 )}
               </>
             ) : currentType === 'TRANSFER' ? (
-              <>
-                {/* Von Konto */}
-                <FormField control={form.control} name="accountId" render={({ field }) => (
+              editTransaction?.transferToId != null ? (
+                /* ── Edit Transfer: read-only summary ── */
+                <>
                   <FormItem>
-                    <FormLabel>Von Konto *</FormLabel>
-                    <Select
-                      onValueChange={(v) => {
-                        field.onChange(v)
-                        setTransferTargetId('')
-                        setTransferGroupId('')
-                        form.setValue('categoryId', '')
-                      }}
-                      value={field.value}
-                      items={accounts.map((a: Account) => ({ value: a.id, label: a.name }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Quellkonto wählen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts.map((a: Account) => (
-                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
+                    <FormLabel>Von Konto</FormLabel>
+                    <p className="text-sm">{editTransaction.account?.name ?? '—'}</p>
                   </FormItem>
-                )} />
-
-                {/* Auf Konto */}
-                <FormItem>
-                  <FormLabel>Auf Konto *</FormLabel>
-                  <Select
-                    onValueChange={(v) => {
-                      if (v !== null) setTransferTargetId(v)
-                      setTransferGroupId('')
-                      form.setValue('categoryId', '')
-                    }}
-                    value={transferTargetId}
-                    disabled={!form.watch('accountId')}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Zielkonto wählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts
-                        .filter((a: Account) => a.id !== form.watch('accountId'))
-                        .map((a: Account) => (
-                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-
-                {/* Sub-Account-Gruppe (nur wenn Zielkonto Sub-Account-Gruppen hat) */}
-                {transferTargetId && targetAccountSubGroups.length > 0 && (
                   <FormItem>
-                    <FormLabel>Gruppe</FormLabel>
-                    <Select
-                      onValueChange={(v) => {
-                        if (v !== null) setTransferGroupId(v)
-                        form.setValue('categoryId', '')
-                      }}
-                      value={transferGroupId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Gruppe wählen" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {targetAccountSubGroups.map(g => (
-                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Auf Konto</FormLabel>
+                    <p className="text-sm text-muted-foreground">
+                      {/* transferToId exists but we don't have the target account name directly */}
+                      Umbuchung (nur Betrag bearbeitbar)
+                    </p>
                   </FormItem>
-                )}
-
-                {/* Kategorie für Transfer (über Sub-Account-Gruppen) */}
-                {transferGroupId && transferSubGroupCategories.length > 0 && (
-                  <FormField control={form.control} name="categoryId" render={({ field }) => (
+                </>
+              ) : (
+                /* ── Create Transfer: full form ── */
+                <>
+                  {/* Von Konto */}
+                  <FormField control={form.control} name="accountId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Kategorie</FormLabel>
-                      <Select onValueChange={(v) => field.onChange(v)} value={field.value ?? ''}>
+                      <FormLabel>Von Konto *</FormLabel>
+                      <Select
+                        onValueChange={(v) => {
+                          field.onChange(v)
+                          setTransferTargetId('')
+                          setTransferGroupId('')
+                          setSourceSubGroupId('')
+                          setSourceCatGroupId('')
+                          setSourceCategoryId('')
+                          setTargetCatGroupId('')
+                          setTargetCategoryId('')
+                        }}
+                        value={field.value}
+                        items={accounts.map((a: Account) => ({ value: a.id, label: a.name }))}
+                      >
                         <SelectTrigger>
-                          <SelectValue placeholder="Kategorie wählen" />
+                          <SelectValue placeholder="Quellkonto wählen" />
                         </SelectTrigger>
                         <SelectContent>
-                          {transferSubGroupCategories.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          {accounts.map((a: Account) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  {/* Buchungsart Quelle */}
+                  {watchedAccountId && (
+                    <FormItem>
+                      <FormLabel>Buchungsart Quelle *</FormLabel>
+                      <Select
+                        onValueChange={(v) => {
+                          const newVal = v as 'MAIN' | 'SUB'
+                          setSourceType(newVal)
+                          setSourceSubGroupId('')
+                          setSourceCatGroupId('')
+                          setSourceCategoryId('')
+                          // Same-account sync: keep types identical
+                          if (isSameAccountTransfer) {
+                            setTargetType(newVal)
+                            setTransferGroupId('')
+                            setTargetCatGroupId('')
+                            setTargetCategoryId('')
+                          }
+                        }}
+                        value={sourceType}
+                        items={[{ value: 'MAIN', label: 'Hauptkonto' }, { value: 'SUB', label: 'Unterkonto' }]}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Buchungsart wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MAIN">Hauptkonto</SelectItem>
+                          <SelectItem value="SUB">Unterkonto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+
+                  {/* Source: Hauptkonto → Gruppe + Kategorie */}
+                  {watchedAccountId && sourceType === 'MAIN' && (
+                    <>
+                      <FormItem>
+                        <FormLabel>Gruppe (Quelle) *</FormLabel>
+                        <Select
+                          onValueChange={(v) => {
+                            if (v !== null) setSourceCatGroupId(v)
+                            setSourceCategoryId('')
+                          }}
+                          value={sourceCatGroupId}
+                          items={sourceCategoryGroups.map(g => ({ value: g.id, label: g.name }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Gruppe wählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {sourceCategoryGroups.map(g => (
+                              <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                      {sourceCatGroupId && sourceCatGroupCategories.length > 0 && (
+                        <FormItem>
+                          <FormLabel>Kategorie (Quelle) *</FormLabel>
+                          <Select
+                            onValueChange={(v) => { if (v !== null) setSourceCategoryId(v) }}
+                            value={sourceCategoryId}
+                            items={sourceCatGroupCategories.map(c => ({ value: c.id, label: c.name }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Kategorie wählen" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sourceCatGroupCategories.map(c => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: c.color }} />
+                                    {c.name}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    </>
+                  )}
+
+                  {/* Source: Unterkonto → Sub-Account-Gruppe */}
+                  {watchedAccountId && sourceType === 'SUB' && sourceAccountSubGroups.length > 0 && (
+                    <FormItem>
+                      <FormLabel>Gruppe (Quelle) *</FormLabel>
+                      <Select
+                        onValueChange={(v) => { if (v !== null) setSourceSubGroupId(v) }}
+                        value={sourceSubGroupId}
+                        items={sourceAccountSubGroups.map(g => ({ value: g.id, label: g.name }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unterkonto-Gruppe wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sourceAccountSubGroups.map(g => (
+                            <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </FormItem>
-                  )} />
-                )}
-              </>
+                  )}
+
+                  {/* Auf Konto */}
+                  {watchedAccountId && (
+                    <FormItem>
+                      <FormLabel>Auf Konto *</FormLabel>
+                      <Select
+                        onValueChange={(v) => {
+                          if (v !== null) setTransferTargetId(v)
+                          setTransferGroupId('')
+                          setTargetCatGroupId('')
+                          setTargetCategoryId('')
+                          // Same-account sync: when switching to same account, sync target type
+                          if (v === watchedAccountId) {
+                            setTargetType(sourceType)
+                          }
+                        }}
+                        value={transferTargetId}
+                        items={accounts.map((a: Account) => ({ value: a.id, label: a.name }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Zielkonto wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((a: Account) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+
+                  {/* Buchungsart Ziel */}
+                  {transferTargetId && (
+                    <FormItem>
+                      <FormLabel>Buchungsart Ziel *</FormLabel>
+                      <Select
+                        onValueChange={(v) => {
+                          const newVal = v as 'MAIN' | 'SUB'
+                          setTargetType(newVal)
+                          setTransferGroupId('')
+                          setTargetCatGroupId('')
+                          setTargetCategoryId('')
+                          // Same-account sync: keep types identical
+                          if (isSameAccountTransfer) {
+                            setSourceType(newVal)
+                            setSourceSubGroupId('')
+                            setSourceCatGroupId('')
+                            setSourceCategoryId('')
+                          }
+                        }}
+                        value={isSameAccountTransfer ? sourceType : targetType}
+                        items={[{ value: 'MAIN', label: 'Hauptkonto' }, { value: 'SUB', label: 'Unterkonto' }]}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Buchungsart wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MAIN">Hauptkonto</SelectItem>
+                          <SelectItem value="SUB">Unterkonto</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+
+                  {/* Target: Hauptkonto → Gruppe + Kategorie */}
+                  {transferTargetId && targetType === 'MAIN' && (
+                    <>
+                      <FormItem>
+                        <FormLabel>Gruppe (Ziel) *</FormLabel>
+                        <Select
+                          onValueChange={(v) => {
+                            if (v !== null) setTargetCatGroupId(v)
+                            setTargetCategoryId('')
+                          }}
+                          value={targetCatGroupId}
+                          items={targetCategoryGroups.map(g => ({ value: g.id, label: g.name }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Gruppe wählen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {targetCategoryGroups.map(g => (
+                              <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                      {targetCatGroupId && targetCatGroupCategories.length > 0 && (
+                        <FormItem>
+                          <FormLabel>Kategorie (Ziel) *</FormLabel>
+                          <Select
+                            onValueChange={(v) => { if (v !== null) setTargetCategoryId(v) }}
+                            value={targetCategoryId}
+                            items={targetCatGroupCategories.map(c => ({ value: c.id, label: c.name }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Kategorie wählen" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {targetCatGroupCategories.map(c => (
+                                <SelectItem key={c.id} value={c.id}>
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: c.color }} />
+                                    {c.name}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    </>
+                  )}
+
+                  {/* Target: Unterkonto → Sub-Account-Gruppe */}
+                  {transferTargetId && targetType === 'SUB' && targetAccountSubGroups.length > 0 && (
+                    <FormItem>
+                      <FormLabel>Gruppe (Ziel) *</FormLabel>
+                      <Select
+                        onValueChange={(v) => {
+                          if (v !== null) setTransferGroupId(v)
+                        }}
+                        value={transferGroupId}
+                        items={targetAccountSubGroups.map(g => ({ value: g.id, label: g.name }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unterkonto-Gruppe wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {targetAccountSubGroups.map(g => (
+                            <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                </>
+              )
             ) : (
               <>
                 {/* Konto (nur wenn nicht vorbelegt) */}
