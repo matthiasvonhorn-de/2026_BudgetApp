@@ -91,6 +91,8 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ['account-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['account-budget'] })
+      queryClient.invalidateQueries({ queryKey: ['budget'] })
       if (revertLoan) queryClient.invalidateQueries({ queryKey: ['loans'] })
       setPendingDelete(null)
       toast.success('Transaktion gelöscht')

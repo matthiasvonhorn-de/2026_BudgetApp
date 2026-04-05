@@ -1,8 +1,8 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,7 @@ import { ReconcileDialog } from '@/components/accounts/ReconcileDialog'
 import { SubAccountsSection } from '@/components/accounts/SubAccountsSection'
 import { AccountBudgetTab } from '@/components/accounts/AccountBudgetTab'
 import { TransactionFormDialog } from '@/components/transactions/TransactionFormDialog'
+import { toast } from 'sonner'
 import type { Transaction } from '@/types/api'
 
 const TABS = ['Transaktionen', 'Unterkonten', 'Budget'] as const
@@ -43,11 +44,27 @@ export default function AccountDetailPage() {
   const { id } = useParams()
   const [reconcileOpen, setReconcileOpen] = useState(false)
   const [newTxOpen, setNewTxOpen] = useState(false)
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [tab, setTab] = useState<Tab>('Transaktionen')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(100)
+  const queryClient = useQueryClient()
 
   const fmt = useFormatCurrency()
+
+  const deleteMutation = useMutation({
+    mutationFn: (txId: string) =>
+      fetch(`/api/transactions/${txId}`, { method: 'DELETE' }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['account-transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['account-budget'] })
+      queryClient.invalidateQueries({ queryKey: ['budget'] })
+      toast.success('Transaktion gelöscht')
+    },
+  })
   const { data: account, isLoading } = useQuery({
     queryKey: ['accounts', id],
     queryFn: () => fetch(`/api/accounts/${id}`).then(r => r.json()),
@@ -164,37 +181,57 @@ export default function AccountDetailPage() {
                   <th className="text-left p-3 font-medium">Beschreibung</th>
                   <th className="text-left p-3 font-medium">Kategorie</th>
                   <th className="text-right p-3 font-medium">Betrag</th>
+                  <th className="p-3"></th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.length === 0 ? (
-                  <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">Keine Transaktionen</td></tr>
-                ) : transactions.map((t: Transaction) => (
-                  <tr key={t.id} className="border-t hover:bg-muted/50">
-                    <td className="p-3 text-muted-foreground">{formatDate(t.date)}</td>
-                    <td className="p-3">
-                      <p className="font-medium">{t.description}</p>
-                      {t.payee && <p className="text-xs text-muted-foreground">{t.payee}</p>}
-                    </td>
-                    <td className="p-3">
-                      {t.category ? (
-                        <Badge variant="outline" style={{ borderColor: t.category.color, color: t.category.color }}>
-                          {t.category.name}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">Keine Kategorie</span>
-                      )}
-                    </td>
-                    {(() => {
-                      const displayAmt = t.mainAmount != null ? t.mainAmount : (t.subAmount ?? 0)
-                      return (
-                        <td className={`p-3 text-right font-semibold ${displayAmt < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                          {fmt(displayAmt)}
-                        </td>
-                      )
-                    })()}
-                  </tr>
-                ))}
+                  <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Keine Transaktionen</td></tr>
+                ) : transactions.map((t: Transaction) => {
+                  const displayAmt = t.mainAmount != null ? t.mainAmount : (t.subAmount ?? 0)
+                  return (
+                    <tr key={t.id} className="border-t hover:bg-muted/50">
+                      <td className="p-3 text-muted-foreground">{formatDate(t.date)}</td>
+                      <td className="p-3">
+                        <p className="font-medium">{t.description}</p>
+                        {t.payee && <p className="text-xs text-muted-foreground">{t.payee}</p>}
+                      </td>
+                      <td className="p-3">
+                        {t.category ? (
+                          <Badge variant="outline" style={{ borderColor: t.category.color, color: t.category.color }}>
+                            {t.category.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Keine Kategorie</span>
+                        )}
+                      </td>
+                      <td className={`p-3 text-right font-semibold ${displayAmt < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                        {fmt(displayAmt)}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-1 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-foreground h-7 px-2"
+                            onClick={() => setEditingTransaction(t)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-destructive h-7 px-2"
+                            onClick={() => { if (confirm('Transaktion löschen?')) deleteMutation.mutate(t.id) }}
+                            disabled={deleteMutation.isPending}
+                          >
+                            ×
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -247,6 +284,12 @@ export default function AccountDetailPage() {
         onOpenChange={setNewTxOpen}
         defaultAccountId={id as string}
         hideAccountSelector
+      />
+
+      <TransactionFormDialog
+        open={!!editingTransaction}
+        onOpenChange={(v) => { if (!v) setEditingTransaction(null) }}
+        editTransaction={editingTransaction}
       />
 
       {tab === 'Unterkonten' && (

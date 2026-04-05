@@ -191,6 +191,8 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
       queryClient.invalidateQueries({ queryKey: ['account-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['account-budget'] })
+      queryClient.invalidateQueries({ queryKey: ['budget'] })
       toast.success('Transaktion erstellt')
       handleClose()
     },
@@ -238,6 +240,8 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
       queryClient.invalidateQueries({ queryKey: ['account-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['account-budget'] })
+      queryClient.invalidateQueries({ queryKey: ['budget'] })
       toast.success('Transaktion aktualisiert')
       handleClose()
     },
