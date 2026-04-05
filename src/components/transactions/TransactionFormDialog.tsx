@@ -198,11 +198,21 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
 
   const updateMutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      const mainAmount = values.mainType === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
-      const res = await fetch(`/api/transactions/${editTransaction!.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const isSubOnly = editTransaction!.mainAmount == null && editTransaction!.subAccountEntryId != null
+
+      let body: Record<string, unknown>
+      if (isSubOnly) {
+        // Sub-Only-TX: nur subAmount/description/date ändern, mainAmount bleibt null
+        const subAmount = -Math.abs(values.amount) // Sub-Entries sind negativ (Allokation)
+        body = {
+          date: values.date,
+          subAmount,
+          description: values.description,
+          status: editTransaction!.status,
+        }
+      } else {
+        const mainAmount = values.mainType === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
+        body = {
           date: values.date,
           mainAmount,
           mainType: values.mainType,
@@ -211,7 +221,13 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
           notes: values.notes || null,
           categoryId: values.categoryId || null,
           status: editTransaction!.status,
-        }),
+        }
+      }
+
+      const res = await fetch(`/api/transactions/${editTransaction!.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error('Fehler')
       return res.json()

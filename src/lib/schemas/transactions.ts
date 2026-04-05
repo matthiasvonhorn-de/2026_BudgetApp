@@ -23,6 +23,8 @@ export const updateTransactionSchema = z.object({
   date: z.string().optional(),
   mainAmount: z.number().optional().nullable(),
   mainType: transactionType.optional(),
+  subAmount: z.number().optional().nullable(),
+  subType: transactionType.optional().nullable(),
   description: z.string().min(1).optional(),
   payee: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),

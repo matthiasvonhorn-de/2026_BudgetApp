@@ -35,6 +35,47 @@ export const PUT = withHandler(async (request: Request, ctx) => {
       })
     }
 
+    // Sub-Only-TX: subAmount direkt aktualisieren + Entry synchronisieren
+    if (data.subAmount !== undefined && existing.mainAmount == null) {
+      const newSubAmount = data.subAmount ?? existing.subAmount ?? 0
+      const newSubType = newSubAmount > 0 ? 'INCOME' : 'EXPENSE'
+      const subDiff = newSubAmount - (existing.subAmount ?? 0)
+
+      const updated = await tx.transaction.update({
+        where: { id },
+        data: {
+          ...(data.date && { date: newDate }),
+          ...(data.description && { description: newDescription }),
+          subAmount: newSubAmount,
+          subType: newSubType,
+          ...(data.status && { status: data.status }),
+        },
+        include: { account: true, category: { include: { subAccountGroup: true } } },
+      })
+
+      // Entry synchronisieren
+      if (existing.subAccountEntryId) {
+        await tx.subAccountEntry.update({
+          where: { id: existing.subAccountEntryId },
+          data: {
+            amount: newSubAmount,
+            ...(data.date && { date: newDate }),
+            ...(data.description && { description: newDescription }),
+          },
+        })
+      }
+
+      // Balance aktualisieren
+      if (subDiff !== 0) {
+        await tx.account.update({
+          where: { id: existing.accountId },
+          data: { currentBalance: { increment: subDiff } },
+        })
+      }
+
+      return updated
+    }
+
     const updated = await tx.transaction.update({
       where: { id },
       data: {
@@ -50,7 +91,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
       include: { account: true, category: { include: { subAccountGroup: true } } },
     })
 
-    // Delegate entry + TRANSFER sync to service layer
+    // Delegate entry + TRANSFER sync to service layer (nur für TX mit mainAmount)
     const newCategoryId = data.categoryId !== undefined ? data.categoryId : existing.categoryId
     if (newMainAmount != null) {
       const oldMainForEntry = existing.mainAmount ?? 0
