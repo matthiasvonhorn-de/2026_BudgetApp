@@ -523,11 +523,11 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                     </FormItem>
                   )}
 
-                  {/* Source: Hauptkonto → Gruppe + Kategorie */}
-                  {watchedAccountId && sourceType === 'MAIN' && (
+                  {/* Source: Hauptkonto → Gruppe + Kategorie (nur wenn Gruppen vorhanden) */}
+                  {watchedAccountId && sourceType === 'MAIN' && sourceCategoryGroups.length > 0 && (
                     <>
                       <FormItem>
-                        <FormLabel>Gruppe (Quelle) *</FormLabel>
+                        <FormLabel>Gruppe (Quelle)</FormLabel>
                         <Select
                           onValueChange={(v) => {
                             if (v !== null) setSourceCatGroupId(v)
@@ -548,7 +548,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                       </FormItem>
                       {sourceCatGroupId && sourceCatGroupCategories.length > 0 && (
                         <FormItem>
-                          <FormLabel>Kategorie (Quelle) *</FormLabel>
+                          <FormLabel>Kategorie (Quelle)</FormLabel>
                           <Select
                             onValueChange={(v) => { if (v !== null) setSourceCategoryId(v) }}
                             value={sourceCategoryId}
@@ -573,10 +573,10 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                     </>
                   )}
 
-                  {/* Source: Unterkonto → Sub-Account-Gruppe */}
+                  {/* Source: Unterkonto → Sub-Account-Gruppe (nur wenn vorhanden) */}
                   {watchedAccountId && sourceType === 'SUB' && sourceAccountSubGroups.length > 0 && (
                     <FormItem>
-                      <FormLabel>Gruppe (Quelle) *</FormLabel>
+                      <FormLabel>Gruppe (Quelle)</FormLabel>
                       <Select
                         onValueChange={(v) => { if (v !== null) setSourceSubGroupId(v) }}
                         value={sourceSubGroupId}
@@ -657,11 +657,11 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                     </FormItem>
                   )}
 
-                  {/* Target: Hauptkonto → Gruppe + Kategorie */}
-                  {transferTargetId && targetType === 'MAIN' && (
+                  {/* Target: Hauptkonto → Gruppe + Kategorie (nur wenn Gruppen vorhanden) */}
+                  {transferTargetId && targetType === 'MAIN' && targetCategoryGroups.length > 0 && (
                     <>
                       <FormItem>
-                        <FormLabel>Gruppe (Ziel) *</FormLabel>
+                        <FormLabel>Gruppe (Ziel)</FormLabel>
                         <Select
                           onValueChange={(v) => {
                             if (v !== null) setTargetCatGroupId(v)
@@ -682,7 +682,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                       </FormItem>
                       {targetCatGroupId && targetCatGroupCategories.length > 0 && (
                         <FormItem>
-                          <FormLabel>Kategorie (Ziel) *</FormLabel>
+                          <FormLabel>Kategorie (Ziel)</FormLabel>
                           <Select
                             onValueChange={(v) => { if (v !== null) setTargetCategoryId(v) }}
                             value={targetCategoryId}
@@ -707,10 +707,10 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                     </>
                   )}
 
-                  {/* Target: Unterkonto → Sub-Account-Gruppe */}
+                  {/* Target: Unterkonto → Sub-Account-Gruppe (nur wenn vorhanden) */}
                   {transferTargetId && targetType === 'SUB' && targetAccountSubGroups.length > 0 && (
                     <FormItem>
-                      <FormLabel>Gruppe (Ziel) *</FormLabel>
+                      <FormLabel>Gruppe (Ziel)</FormLabel>
                       <Select
                         onValueChange={(v) => {
                           if (v !== null) setTransferGroupId(v)
