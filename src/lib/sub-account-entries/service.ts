@@ -1,3 +1,4 @@
+import { TransactionStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { DomainError } from '@/lib/api/errors'
 
@@ -160,4 +161,179 @@ export async function deleteLinkedEntry(entryId: string) {
     // Delete entry
     await tx.subAccountEntry.delete({ where: { id: entryId } })
   })
+}
+
+// ── Task 4 ─────────────────────────────────────────────────────────────────
+
+interface CreateEntryFromTransactionInput {
+  transactionId: string
+  transactionAmount: number
+  date: Date
+  description: string
+  status: TransactionStatus
+  categoryId: string | null
+  linkedGroupId: string
+  linkType: string
+  skipPairedTransfer?: boolean
+}
+
+export async function createEntryFromTransaction(tx: TxClient, input: CreateEntryFromTransactionInput) {
+  const { transactionId, transactionAmount, date, description, status, categoryId, linkedGroupId, linkType, skipPairedTransfer } = input
+
+  const entryAmount = -transactionAmount
+  const entry = await tx.subAccountEntry.create({
+    data: {
+      date,
+      description,
+      amount: entryAmount,
+      fromBudget: true,
+      groupId: linkedGroupId,
+    },
+  })
+
+  await tx.transaction.update({
+    where: { id: transactionId },
+    data: { subAccountEntryId: entry.id },
+  })
+
+  let pairedTransactionId: string | null = null
+
+  if (linkType === 'TRANSFER' && !skipPairedTransfer) {
+    const group = await tx.subAccountGroup.findUnique({
+      where: { id: linkedGroupId },
+      include: { subAccount: true },
+    })
+    if (group) {
+      const targetAccountId = group.subAccount.accountId
+      const pairedAmount = -transactionAmount
+
+      const paired = await tx.transaction.create({
+        data: {
+          date,
+          amount: pairedAmount,
+          description,
+          accountId: targetAccountId,
+          categoryId,
+          type: 'TRANSFER',
+          status,
+        },
+      })
+
+      await tx.account.update({
+        where: { id: targetAccountId },
+        data: { currentBalance: { increment: pairedAmount } },
+      })
+
+      await tx.transaction.update({
+        where: { id: transactionId },
+        data: { transferToId: paired.id },
+      })
+
+      pairedTransactionId = paired.id
+    }
+  }
+
+  return { entry, pairedTransactionId }
+}
+
+interface UpdateEntryFromTransactionInput {
+  newAmount: number
+  oldAmount: number
+  date: Date
+  description: string
+  newCategoryId: string | null
+  existingSubAccountEntryId: string | null
+  existingTransferId: string | null
+  existingStatus: TransactionStatus
+  transactionId: string
+}
+
+export async function updateEntryFromTransaction(tx: TxClient, input: UpdateEntryFromTransactionInput) {
+  const { newAmount, oldAmount, date, description, newCategoryId, existingSubAccountEntryId, existingTransferId, existingStatus, transactionId } = input
+
+  // Resolve new category's sub-account group
+  let newSubGroupId: string | null = null
+  let newLinkType = 'BOOKING'
+  if (newCategoryId) {
+    const cat = await tx.category.findUnique({
+      where: { id: newCategoryId },
+      select: { subAccountGroupId: true, subAccountLinkType: true },
+    })
+    newSubGroupId = cat?.subAccountGroupId ?? null
+    newLinkType = cat?.subAccountLinkType ?? 'BOOKING'
+  }
+
+  const hadEntry = !!existingSubAccountEntryId
+
+  // Sync sub-account entry
+  if (hadEntry && newSubGroupId) {
+    await tx.subAccountEntry.update({
+      where: { id: existingSubAccountEntryId! },
+      data: { date, description, amount: -newAmount, groupId: newSubGroupId },
+    })
+  } else if (hadEntry && !newSubGroupId) {
+    await tx.transaction.update({ where: { id: transactionId }, data: { subAccountEntryId: null } })
+    await tx.subAccountEntry.delete({ where: { id: existingSubAccountEntryId! } })
+  } else if (!hadEntry && newSubGroupId) {
+    const entry = await tx.subAccountEntry.create({
+      data: { date, description, amount: -newAmount, fromBudget: true, groupId: newSubGroupId },
+    })
+    await tx.transaction.update({ where: { id: transactionId }, data: { subAccountEntryId: entry.id } })
+  }
+
+  // Sync paired TRANSFER transaction
+  if (existingTransferId) {
+    const paired = await tx.transaction.findUnique({ where: { id: existingTransferId } })
+    if (paired) {
+      const pairedDiff = -(newAmount - oldAmount)
+      if (newAmount !== oldAmount) {
+        await tx.account.update({
+          where: { id: paired.accountId },
+          data: { currentBalance: { increment: pairedDiff } },
+        })
+      }
+      await tx.transaction.update({
+        where: { id: existingTransferId },
+        data: {
+          date,
+          description,
+          amount: -newAmount,
+        },
+      })
+    }
+  } else if (!existingTransferId && newSubGroupId && newLinkType === 'TRANSFER') {
+    const group = await tx.subAccountGroup.findUnique({
+      where: { id: newSubGroupId },
+      include: { subAccount: true },
+    })
+    if (group) {
+      const targetAccountId = group.subAccount.accountId
+      const paired = await tx.transaction.create({
+        data: {
+          date,
+          amount: -newAmount,
+          description,
+          accountId: targetAccountId,
+          categoryId: newCategoryId,
+          type: 'TRANSFER',
+          status: existingStatus,
+        },
+      })
+      await tx.account.update({
+        where: { id: targetAccountId },
+        data: { currentBalance: { increment: -newAmount } },
+      })
+      await tx.transaction.update({ where: { id: transactionId }, data: { transferToId: paired.id } })
+    }
+  }
+}
+
+export async function deleteEntryFromTransaction(tx: TxClient, subAccountEntryId: string | null) {
+  if (!subAccountEntryId) return
+  // Unlink first (FK constraint), then delete
+  await tx.transaction.updateMany({
+    where: { subAccountEntryId },
+    data: { subAccountEntryId: null },
+  })
+  await tx.subAccountEntry.delete({ where: { id: subAccountEntryId } })
 }
