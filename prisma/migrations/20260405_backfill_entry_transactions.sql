@@ -24,17 +24,9 @@ WHERE NOT EXISTS (
   SELECT 1 FROM "Transaction" t WHERE t.subAccountEntryId = e.id
 );
 
--- Step 2: Recalculate currentBalance for all affected accounts.
--- currentBalance = SUM(all transaction amounts for this account)
-UPDATE Account
-SET currentBalance = (
-  SELECT COALESCE(SUM(t.amount), 0)
-  FROM "Transaction" t
-  WHERE t.accountId = Account.id
-)
-WHERE id IN (
-  SELECT DISTINCT sa.accountId
-  FROM SubAccountEntry e
-  JOIN SubAccountGroup g ON e.groupId = g.id
-  JOIN SubAccount sa ON g.subAccountId = sa.id
-);
+-- Step 2: DO NOT recalculate currentBalance.
+-- Reason: currentBalance may include an implicit initial balance that is NOT
+-- captured as a transaction. Recalculating as SUM(transactions) would lose this.
+-- The retroactive transactions are historical records only — they do not represent
+-- new money movement. Going forward, the increment mechanism on new entries
+-- handles balance updates correctly regardless of whether old entries are factored in.

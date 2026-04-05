@@ -291,7 +291,7 @@ Ein Migrations-Script erstellt fuer jeden bestehenden SubAccountEntry ohne verkn
 
 **categoryId pro Entry:** Mehrere Kategorien koennen dieselbe SubAccountGroup referenzieren. Fuer das Backfill-Script gilt die deterministische Regel: `MIN(category.id)` unter allen Kategorien mit `subAccountGroupId === entry.groupId`. Falls keine Kategorie existiert, wird die Transaction ohne `categoryId` erstellt (mit Warnung im Migrations-Log).
 
-**Neuberechnung currentBalance:** Das `Account`-Modell hat kein `initialBalance` — nur `currentBalance`, das bei Erstellung auf 0 steht und danach ausschliesslich durch Transaction-Inkremente veraendert wird. Die Neuberechnungsformel ist daher: `currentBalance_neu = SUM(transaction.amount) WHERE accountId = ?`. Falls der neu berechnete Saldo vom bisherigen `currentBalance` abweicht (z.B. durch fruehere manuelle Anpassungen), wird die Abweichung im Migrations-Log ausgegeben, damit der Nutzer diese pruefen kann.
+**Keine Neuberechnung von currentBalance:** `currentBalance` darf NICHT als `SUM(transactions)` neu berechnet werden. Grund: Konten koennen einen impliziten Anfangsbestand haben, der nicht als Transaktion existiert. Eine Neuberechnung wuerde diesen verlieren. Die retroaktiven Transactions sind reine historische Buchungsrecords — sie stellen keine neue Geldbewegung dar. Das `increment`-Muster bei neuen Entries funktioniert korrekt unabhaengig davon.
 
 Das Migrations-Script wird als SQL-Datei in `prisma/migrations/` abgelegt.
 
