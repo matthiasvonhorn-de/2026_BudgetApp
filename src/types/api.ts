@@ -251,4 +251,33 @@ export interface NetWorth {
   totalAssets: number
   totalDebts: number
   netWorth: number
+  totalPortfolios: number
+}
+
+// ── Portfolio ───────────────────────────────────────────────────────
+
+export interface Portfolio {
+  id: string
+  name: string
+  color: string
+  notes: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PortfolioListItem extends Portfolio {
+  currentValue: number | null
+  sparklineData: { date: string; value: number }[]
+}
+
+export interface PortfolioDetail extends Portfolio {
+  values: PortfolioValueEntry[]
+}
+
+export interface PortfolioValueEntry {
+  id: string
+  date: string
+  value: number
+  notes: string | null
 }

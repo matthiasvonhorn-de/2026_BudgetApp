@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { BookOpen, SlidersHorizontal, Tag, TrendingDown } from 'lucide-react'
+import { BookOpen, SlidersHorizontal, Tag, TrendingDown, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const settingsItems = [
@@ -28,6 +28,12 @@ const settingsItems = [
     icon: TrendingDown,
     title: 'Bankkredite',
     description: 'Ratenkredite und Annuitätendarlehen anlegen und verwalten',
+  },
+  {
+    href: '/settings/portfolios',
+    icon: TrendingUp,
+    title: 'Aktiendepots',
+    description: 'Depots anlegen und verwalten',
   },
 ]
 
