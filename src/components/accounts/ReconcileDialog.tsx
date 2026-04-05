@@ -40,7 +40,7 @@ export function ReconcileDialog({ accountId, accountName, open, onOpenChange }: 
 
   const clearedSum = pendingTransactions
     .filter((t: Transaction) => selectedIds.has(t.id))
-    .reduce((sum: number, t: Transaction) => sum + t.amount, 0)
+    .reduce((sum: number, t: Transaction) => sum + (t.mainAmount ?? 0) + (t.subAmount ?? 0), 0)
 
   const target = parseFloat(statementBalance.replace(',', '.')) || 0
   const difference = target - clearedSum
@@ -155,9 +155,14 @@ export function ReconcileDialog({ accountId, accountName, open, onOpenChange }: 
                   </td>
                   <td className="p-2 text-muted-foreground">{formatDate(t.date)}</td>
                   <td className="p-2">{t.description}</td>
-                  <td className={`p-2 text-right font-medium ${t.amount < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                    {fmt(t.amount)}
-                  </td>
+                  {(() => {
+                    const displayAmt = (t.mainAmount ?? 0) + (t.subAmount ?? 0)
+                    return (
+                      <td className={`p-2 text-right font-medium ${displayAmt < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                        {fmt(displayAmt)}
+                      </td>
+                    )
+                  })()}
                   <td className="p-2 text-center">
                     <Badge variant={t.status === 'CLEARED' ? 'default' : 'secondary'} className="text-xs">
                       {t.status === 'CLEARED' ? 'Gebucht' : 'Ausstehend'}

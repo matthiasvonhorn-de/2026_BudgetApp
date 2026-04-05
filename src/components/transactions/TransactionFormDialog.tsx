@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { format } from 'date-fns'
 import { useSettingsStore } from '@/store/useSettingsStore'
-import type { Account } from '@/types/api'
+import type { Account, Transaction } from '@/types/api'
 
 const schema = z.object({
   date: z.string().min(1),
@@ -24,7 +24,7 @@ const schema = z.object({
   payee: z.string().optional(),
   accountId: z.string().min(1, 'Konto erforderlich'),
   categoryId: z.string().optional(),
-  type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']),
+  mainType: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']),
   notes: z.string().optional(),
 })
 
@@ -58,9 +58,10 @@ interface Props {
   onOpenChange: (open: boolean) => void
   defaultAccountId?: string
   hideAccountSelector?: boolean
+  editTransaction?: Transaction | null
 }
 
-export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hideAccountSelector }: Props) {
+export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hideAccountSelector, editTransaction }: Props) {
   const queryClient = useQueryClient()
   const { currency } = useSettingsStore()
   const [transferTargetId, setTransferTargetId] = useState('')
@@ -87,13 +88,13 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
       payee: '',
       accountId: '',
       categoryId: '',
-      type: 'EXPENSE',
+      mainType: 'EXPENSE',
       notes: '',
     },
   })
 
   const watchedAccountId = form.watch('accountId')
-  const currentType = form.watch('type')
+  const currentType = form.watch('mainType')
 
   // Kategoriegruppen des gewählten Kontos laden
   const { data: categoryGroups = [] } = useQuery<CategoryGroup[]>({
@@ -102,18 +103,44 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     enabled: !!watchedAccountId && currentType !== 'TRANSFER',
   })
 
-  // Wenn Dialog öffnet: Standard-Konto vorbelegen
+  // Wenn Dialog öffnet: Transaktion vorbelegen (Edit) oder Standard-Konto setzen (Create)
   useEffect(() => {
-    if (open && defaultAccountId) {
+    if (!open) return
+    if (editTransaction) {
+      const displayAmount = editTransaction.mainAmount != null ? editTransaction.mainAmount : (editTransaction.subAmount ?? 0)
+      form.reset({
+        date: format(new Date(editTransaction.date), 'yyyy-MM-dd'),
+        amount: Math.abs(displayAmount),
+        description: editTransaction.description,
+        payee: editTransaction.payee ?? '',
+        accountId: editTransaction.accountId,
+        categoryId: editTransaction.categoryId ?? '',
+        mainType: editTransaction.mainType,
+        notes: editTransaction.notes ?? '',
+      })
+    } else if (defaultAccountId) {
       form.setValue('accountId', defaultAccountId)
     }
-  }, [open, defaultAccountId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, editTransaction, defaultAccountId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Wenn Konto wechselt: Gruppe und Kategorie zurücksetzen
+  // Wenn Konto wechselt: Gruppe und Kategorie zurücksetzen (nur im Create-Modus)
   useEffect(() => {
+    if (editTransaction) return // Im Edit-Modus nicht zurücksetzen — der Prefill-Effect übernimmt
     setSelectedGroupId('')
     form.setValue('categoryId', '')
   }, [watchedAccountId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Im Edit-Modus: Gruppe und Kategorie setzen, sobald categoryGroups geladen sind
+  useEffect(() => {
+    if (!editTransaction || !categoryGroups.length) return
+    const categoryId = editTransaction.categoryId
+    if (!categoryId) return
+    const group = categoryGroups.find(g => g.categories.some(c => c.id === categoryId))
+    if (group) {
+      setSelectedGroupId(group.id)
+      form.setValue('categoryId', categoryId)
+    }
+  }, [editTransaction, categoryGroups]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kategorien der ausgewählten Gruppe
   const groupCategories = selectedGroupId
@@ -127,7 +154,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
   const transferSubGroupCategories: Category[] = [] // Transfer-Kategorie über Sub-Account-Gruppen (bestehende Logik)
 
   function handleTypeChange(v: string) {
-    form.setValue('type', v as FormValues['type'])
+    form.setValue('mainType', v as FormValues['mainType'])
     setTransferTargetId('')
     setTransferGroupId('')
     setSelectedGroupId('')
@@ -139,17 +166,21 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     form.setValue('categoryId', '')
   }
 
-  const mutation = useMutation({
+  const createMutation = useMutation({
     mutationFn: async (values: FormValues) => {
-      const amount = values.type === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
+      const mainAmount = values.mainType === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...values,
-          amount,
-          categoryId: values.categoryId || null,
+          date: values.date,
+          mainAmount,
+          mainType: values.mainType,
+          description: values.description,
           payee: values.payee || null,
+          notes: values.notes || null,
+          accountId: values.accountId,
+          categoryId: values.categoryId || null,
         }),
       })
       if (!res.ok) throw new Error('Fehler')
@@ -157,46 +188,112 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['account-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
       toast.success('Transaktion erstellt')
-      onOpenChange(false)
-      form.reset({ date: format(new Date(), 'yyyy-MM-dd'), type: 'EXPENSE', amount: 0 })
-      setTransferTargetId('')
-      setTransferGroupId('')
-      setSelectedGroupId('')
+      handleClose()
     },
     onError: () => toast.error('Fehler beim Speichern'),
   })
+
+  const updateMutation = useMutation({
+    mutationFn: async (values: FormValues) => {
+      const isSubOnly = editTransaction!.mainAmount == null && editTransaction!.subAccountEntryId != null
+
+      let body: Record<string, unknown>
+      if (isSubOnly) {
+        // Sub-Only-TX: nur subAmount/description/date ändern, mainAmount bleibt null
+        const subAmount = -Math.abs(values.amount) // Sub-Entries sind negativ (Allokation)
+        body = {
+          date: values.date,
+          subAmount,
+          description: values.description,
+          status: editTransaction!.status,
+        }
+      } else {
+        const mainAmount = values.mainType === 'INCOME' ? Math.abs(values.amount) : -Math.abs(values.amount)
+        body = {
+          date: values.date,
+          mainAmount,
+          mainType: values.mainType,
+          description: values.description,
+          payee: values.payee || null,
+          notes: values.notes || null,
+          categoryId: values.categoryId || null,
+          status: editTransaction!.status,
+        }
+      }
+
+      const res = await fetch(`/api/transactions/${editTransaction!.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error('Fehler')
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['account-transactions'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
+      toast.success('Transaktion aktualisiert')
+      handleClose()
+    },
+    onError: () => toast.error('Fehler beim Speichern'),
+  })
+
+  const mutation = editTransaction ? updateMutation : createMutation
+
+  function handleClose() {
+    onOpenChange(false)
+    form.reset({ date: format(new Date(), 'yyyy-MM-dd'), mainType: 'EXPENSE', amount: 0 })
+    setTransferTargetId('')
+    setTransferGroupId('')
+    setSelectedGroupId('')
+  }
+
+  // Erkennung: Ist das eine Sub-Account-TX (nur Unterkonto, kein Hauptkonto)?
+  const isSubOnlyTx = editTransaction?.subAccountEntry != null && editTransaction?.mainAmount == null
+  const subGroupInfo = editTransaction?.subAccountEntry?.group
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Neue Transaktion</DialogTitle>
+          <DialogTitle>{editTransaction ? 'Transaktion bearbeiten' : 'Neue Transaktion'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
 
-            {/* Typ */}
-            <FormField control={form.control} name="type" render={({ field }) => (
+            {/* Typ — read-only bei Sub-Only-TX */}
+            {isSubOnlyTx ? (
               <FormItem>
                 <FormLabel>Typ</FormLabel>
-                <Select
-                  onValueChange={(v) => v && handleTypeChange(v)}
-                  value={field.value}
-                  itemToStringLabel={(v: string) => ({ EXPENSE: 'Ausgabe', INCOME: 'Einnahme', TRANSFER: 'Umbuchung' }[v] ?? v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Typ wählen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EXPENSE">Ausgabe</SelectItem>
-                    <SelectItem value="INCOME">Einnahme</SelectItem>
-                    <SelectItem value="TRANSFER">Umbuchung</SelectItem>
-                  </SelectContent>
-                </Select>
+                <p className="text-sm text-muted-foreground">Unterkonto-Buchung</p>
               </FormItem>
-            )} />
+            ) : (
+              <FormField control={form.control} name="mainType" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Typ</FormLabel>
+                  <Select
+                    onValueChange={(v) => v && handleTypeChange(v)}
+                    value={field.value}
+                    itemToStringLabel={(v: string) => ({ EXPENSE: 'Ausgabe', INCOME: 'Einnahme', TRANSFER: 'Umbuchung' }[v] ?? v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Typ wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EXPENSE">Ausgabe</SelectItem>
+                      <SelectItem value="INCOME">Einnahme</SelectItem>
+                      <SelectItem value="TRANSFER">Umbuchung</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
+            )}
 
             {/* Datum */}
             <FormField control={form.control} name="date" render={({ field }) => (
@@ -235,7 +332,27 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
               </FormItem>
             )} />
 
-            {currentType === 'TRANSFER' ? (
+            {isSubOnlyTx ? (
+              <>
+                {/* Sub-Only-TX: Konto und Unterkonto-Gruppe als Info */}
+                <FormItem>
+                  <FormLabel>Konto</FormLabel>
+                  <p className="text-sm">{editTransaction?.account?.name ?? '—'}</p>
+                </FormItem>
+                {subGroupInfo && (
+                  <>
+                    <FormItem>
+                      <FormLabel>Unterkonto</FormLabel>
+                      <p className="text-sm">{subGroupInfo.subAccount.name}</p>
+                    </FormItem>
+                    <FormItem>
+                      <FormLabel>Gruppe</FormLabel>
+                      <p className="text-sm">{subGroupInfo.name}</p>
+                    </FormItem>
+                  </>
+                )}
+              </>
+            ) : currentType === 'TRANSFER' ? (
               <>
                 {/* Von Konto */}
                 <FormField control={form.control} name="accountId" render={({ field }) => (
@@ -364,6 +481,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                     <Select
                       onValueChange={(v) => handleGroupChange(v === '__none__' ? '' : (v ?? ''))}
                       value={selectedGroupId || '__none__'}
+                      items={[{ value: '__none__', label: '— Keine Gruppe —' }, ...categoryGroups.map(g => ({ value: g.id, label: g.name }))]}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Gruppe wählen" />
@@ -386,6 +504,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
                       <Select
                         onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}
                         value={field.value || '__none__'}
+                        items={[{ value: '__none__', label: '— Keine Kategorie —' }, ...groupCategories.map(c => ({ value: c.id, label: c.name }))]}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Kategorie wählen" />
@@ -409,7 +528,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
             )}
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Abbrechen</Button>
+              <Button type="button" variant="outline" onClick={handleClose}>Abbrechen</Button>
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending ? 'Speichern...' : 'Speichern'}
               </Button>

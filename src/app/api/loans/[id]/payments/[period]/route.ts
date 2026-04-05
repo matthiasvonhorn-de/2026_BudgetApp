@@ -65,12 +65,12 @@ export const PUT = withHandler(async (request: Request, ctx) => {
         const t = await tx.transaction.create({
           data: {
             date: currentRow.dueDate,
-            amount: totalPayment,
+            mainAmount: totalPayment,
+            mainType: 'EXPENSE',
             description: `Kredit: ${loanData.name} – Rate ${periodNumber}`,
             notes: `Zinsen: ${currentRow.scheduledInterest.toFixed(2)} | Tilgung: ${(currentRow.scheduledPrincipal + extraPayment).toFixed(2)}`,
             accountId: loanData.accountId,
             categoryId: effectiveCategoryId ?? null,
-            type: 'EXPENSE',
             status: 'CLEARED',
           },
         })
@@ -89,7 +89,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
           await tx.transaction.delete({ where: { id: existing.id } })
           await tx.account.update({
             where: { id: loanData.accountId },
-            data: { currentBalance: { increment: -existing.amount } },
+            data: { currentBalance: { increment: -((existing.mainAmount ?? 0) + (existing.subAmount ?? 0)) } },
           })
         }
         await tx.loanPayment.update({
@@ -100,11 +100,12 @@ export const PUT = withHandler(async (request: Request, ctx) => {
         // Sondertilgung geändert bei bereits bezahlter Rate → Transaktionsbetrag korrigieren
         const existing = await tx.transaction.findUnique({ where: { id: currentRow.transactionId } })
         if (existing) {
-          const diff = totalPayment - existing.amount
+          const diff = totalPayment - (existing.mainAmount ?? 0)
           await tx.transaction.update({
             where: { id: existing.id },
             data: {
-              amount: totalPayment,
+              mainAmount: totalPayment,
+              mainType: 'EXPENSE',
               notes: `Zinsen: ${currentRow.scheduledInterest.toFixed(2)} | Tilgung: ${(currentRow.scheduledPrincipal + extraPayment).toFixed(2)}`,
             },
           })

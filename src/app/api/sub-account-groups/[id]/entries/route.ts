@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { withHandler } from '@/lib/api/handler'
+import { createLinkedEntry } from '@/lib/sub-account-entries/service'
 
 export const POST = withHandler(async (request: Request, ctx) => {
   const { id } = await (ctx as { params: Promise<{ id: string }> }).params
@@ -11,9 +11,17 @@ export const POST = withHandler(async (request: Request, ctx) => {
     description: z.string().min(1),
     amount: z.coerce.number(),
     fromBudget: z.boolean().default(false),
+    categoryId: z.string().min(1),
   }).parse(body)
-  const entry = await prisma.subAccountEntry.create({
-    data: { ...data, date: new Date(data.date), groupId: id },
+
+  const result = await createLinkedEntry({
+    groupId: id,
+    categoryId: data.categoryId,
+    date: data.date,
+    description: data.description,
+    amount: data.amount,
+    fromBudget: data.fromBudget,
   })
-  return NextResponse.json(entry, { status: 201 })
+
+  return NextResponse.json(result.entry, { status: 201 })
 })

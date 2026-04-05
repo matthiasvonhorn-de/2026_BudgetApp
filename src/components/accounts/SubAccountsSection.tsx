@@ -16,11 +16,17 @@ interface SubAccountEntry {
   fromBudget: boolean
 }
 
+interface LinkedCategory {
+  id: string
+  subAccountLinkType: string
+}
+
 interface SubAccountGroup {
   id: string
   name: string
   initialBalance: number
   entries: SubAccountEntry[]
+  linkedCategories: LinkedCategory[]
 }
 
 interface SubAccount {
@@ -69,7 +75,7 @@ function InlineEdit({
 }
 
 // ---- New entry row ----
-function NewEntryRow({ groupId, accountId, onDone }: { groupId: string; accountId: string; onDone: () => void }) {
+function NewEntryRow({ groupId, accountId, categoryId, onDone }: { groupId: string; accountId: string; categoryId: string; onDone: () => void }) {
   const qc = useQueryClient()
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [description, setDescription] = useState('')
@@ -79,12 +85,15 @@ function NewEntryRow({ groupId, accountId, onDone }: { groupId: string; accountI
       fetch(`/api/sub-account-groups/${groupId}/entries`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, description, amount: parseFloat(amount), fromBudget: false }),
+        body: JSON.stringify({ date, description, amount: parseFloat(amount), fromBudget: false, categoryId }),
       }).then(r => r.json()),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sub-accounts', accountId] })
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+      qc.invalidateQueries({ queryKey: ['accounts'] })
       onDone()
     },
+    onError: () => toast.error('Fehler beim Erstellen des Eintrags'),
   })
 
   const valid = description.trim() && amount && !isNaN(parseFloat(amount))
@@ -172,7 +181,11 @@ function GroupSection({
       if (!res.ok) throw new Error(await res.text())
       return res.json()
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sub-accounts', accountId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sub-accounts', accountId] })
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+      qc.invalidateQueries({ queryKey: ['accounts'] })
+    },
     onError: () => toast.error('Fehler beim Löschen des Eintrags'),
   })
 
@@ -265,9 +278,11 @@ function GroupSection({
       ))}
 
       {/* Add entry row */}
-      {expanded && (
-        addingEntry
-          ? <NewEntryRow groupId={group.id} accountId={accountId} onDone={() => setAddingEntry(false)} />
+      {expanded && (() => {
+        const bookingCategory = group.linkedCategories?.find(c => c.subAccountLinkType === 'BOOKING')
+        if (!bookingCategory) return null
+        return addingEntry
+          ? <NewEntryRow groupId={group.id} accountId={accountId} categoryId={bookingCategory.id} onDone={() => setAddingEntry(false)} />
           : (
             <tr>
               <td colSpan={5} className="px-2 py-1 pl-8">
@@ -280,7 +295,7 @@ function GroupSection({
               </td>
             </tr>
           )
-      )}
+      })()}
     </tbody>
   )
 }

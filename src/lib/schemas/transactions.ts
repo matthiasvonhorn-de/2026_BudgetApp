@@ -5,13 +5,15 @@ const transactionStatus = z.enum(['PENDING', 'CLEARED', 'RECONCILED'])
 
 export const createTransactionSchema = z.object({
   date: z.string(),
-  amount: z.number(),
+  mainAmount: z.number().optional().nullable(),
+  mainType: transactionType.default('INCOME'),
+  subAmount: z.number().optional().nullable(),
+  subType: transactionType.optional().nullable(),
   description: z.string().min(1),
   payee: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   accountId: z.string(),
   categoryId: z.string().optional().nullable(),
-  type: transactionType.default('EXPENSE'),
   status: transactionStatus.default('PENDING'),
   skipSubAccountEntry: z.boolean().optional().default(false),
   skipPairedTransfer: z.boolean().optional().default(false),
@@ -19,7 +21,10 @@ export const createTransactionSchema = z.object({
 
 export const updateTransactionSchema = z.object({
   date: z.string().optional(),
-  amount: z.number().optional(),
+  mainAmount: z.number().optional().nullable(),
+  mainType: transactionType.optional(),
+  subAmount: z.number().optional().nullable(),
+  subType: transactionType.optional().nullable(),
   description: z.string().min(1).optional(),
   payee: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -36,6 +41,5 @@ export const importTransactionsSchema = z.object({
     payee: z.string().optional().nullable(),
     categoryId: z.string().optional().nullable(),
     hash: z.string(),
-    type: transactionType.default('EXPENSE'),
   })),
 })

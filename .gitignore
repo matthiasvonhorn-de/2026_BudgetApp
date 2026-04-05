@@ -42,6 +42,7 @@ next-env.d.ts
 node_modules/
 dist/
 prisma/dev.db
+prisma/prod.db
 
 # Playwright MCP artifacts
 .playwright-mcp/

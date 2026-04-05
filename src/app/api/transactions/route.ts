@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { createTransactionSchema } from '@/lib/schemas/transactions'
+import { createEntryFromTransaction } from '@/lib/sub-account-entries/service'
 
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
@@ -37,6 +38,11 @@ export const GET = withHandler(async (request: Request) => {
       include: {
         account: { select: { id: true, name: true, color: true } },
         category: { select: { id: true, name: true, color: true, type: true } },
+        subAccountEntry: {
+          select: {
+            group: { select: { id: true, name: true, subAccount: { select: { id: true, name: true } } } },
+          },
+        },
       },
       orderBy: { date: 'desc' },
       ...(pageSize > 0 && { skip: (page - 1) * pageSize, take: pageSize }),
@@ -88,76 +94,66 @@ export const POST = withHandler(async (request: Request) => {
     const linkType = category?.subAccountLinkType ?? 'BOOKING'
 
     // For TRANSFER link type, override the transaction type
-    const txType = linkedGroup && linkType === 'TRANSFER' && !data.skipSubAccountEntry ? 'TRANSFER' : data.type
+    const txMainType = linkedGroup && linkType === 'TRANSFER' && !data.skipSubAccountEntry
+      ? 'TRANSFER'
+      : data.mainType
 
     // Create source transaction
     const { skipSubAccountEntry: _skip1, skipPairedTransfer: _skip2, ...txData } = data
     const t = await tx.transaction.create({
       data: {
-        ...txData,
-        type: txType,
         date: new Date(data.date),
+        mainAmount: txData.mainAmount ?? null,
+        mainType: txMainType,
+        subAmount: txData.subAmount ?? null,
+        subType: txData.subType ?? null,
+        description: txData.description,
+        payee: txData.payee || null,
+        notes: txData.notes || null,
+        accountId: txData.accountId,
         categoryId: data.categoryId || null,
+        status: txData.status ?? 'PENDING',
       },
       include: { account: true, category: true },
     })
 
-    // Update source account balance
-    await tx.account.update({
-      where: { id: data.accountId },
-      data: { currentBalance: { increment: data.amount } },
-    })
-
-    if (linkedGroup && !data.skipSubAccountEntry) {
-      // Sub-account entry: expense on main account → income in sub-account
-      const entryAmount = -data.amount
-      const entry = await tx.subAccountEntry.create({
-        data: {
-          date: new Date(data.date),
-          description: data.description,
-          amount: entryAmount,
-          fromBudget: true,
-          groupId: linkedGroup.id,
-        },
+    // Update source account balance: mainAmount + subAmount
+    const balanceIncrement = (data.mainAmount ?? 0) + (data.subAmount ?? 0)
+    if (balanceIncrement !== 0) {
+      await tx.account.update({
+        where: { id: data.accountId },
+        data: { currentBalance: { increment: balanceIncrement } },
       })
-      await tx.transaction.update({
-        where: { id: t.id },
-        data: { subAccountEntryId: entry.id },
+    }
+
+    // Delegate entry + TRANSFER pair creation to service layer
+    if (linkedGroup && !data.skipSubAccountEntry && data.mainAmount != null) {
+      const result = await createEntryFromTransaction(tx, {
+        transactionId: t.id,
+        transactionMainAmount: data.mainAmount,
+        date: new Date(data.date),
+        description: data.description,
+        status: (data.status ?? 'PENDING') as any,
+        categoryId: data.categoryId || null,
+        linkedGroupId: linkedGroup.id,
+        linkType,
+        skipPairedTransfer: data.skipPairedTransfer,
       })
 
-      if (linkType === 'TRANSFER' && !data.skipPairedTransfer) {
-        // Create paired TRANSFER transaction on the target account
-        const targetAccountId = linkedGroup.subAccount.accountId
-        const pairedAmount = -data.amount  // opposite sign
+      // createEntryFromTransaction sets subAmount on the transaction, recalculate balance
+      const subAmount = -data.mainAmount
+      await tx.account.update({
+        where: { id: data.accountId },
+        data: { currentBalance: { increment: subAmount } },
+      })
 
-        const paired = await tx.transaction.create({
-          data: {
-            date: new Date(data.date),
-            amount: pairedAmount,
-            description: data.description,
-            accountId: targetAccountId,
-            categoryId: data.categoryId || null,
-            type: 'TRANSFER',
-            status: data.status,
-          },
-        })
-
-        // Update target account balance
-        await tx.account.update({
-          where: { id: targetAccountId },
-          data: { currentBalance: { increment: pairedAmount } },
-        })
-
-        // Link both transactions as a transfer pair
-        await tx.transaction.update({
-          where: { id: t.id },
-          data: { transferToId: paired.id },
-        })
-
-        return { ...t, transferToId: paired.id, subAccountEntryId: entry.id }
+      return {
+        ...t,
+        subAccountEntryId: result.entry.id,
+        subAmount,
+        subType: subAmount >= 0 ? 'INCOME' : 'EXPENSE',
+        ...(result.pairedTransactionId && { transferToId: result.pairedTransactionId }),
       }
-
-      return { ...t, subAccountEntryId: entry.id }
     }
 
     return t

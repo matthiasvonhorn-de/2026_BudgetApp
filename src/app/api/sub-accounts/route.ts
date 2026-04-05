@@ -15,35 +15,17 @@ export const GET = withHandler(async () => {
     },
   })
 
-  // Accounts that have at least one transaction with a category
-  const accountsWithCategorizedTx = await prisma.account.findMany({
-    where: {
-      transactions: {
-        some: { categoryId: { not: null } },
-      },
-    },
-    select: { id: true, currentBalance: true },
-  })
-
-  // Subtract internal allocations — TRANSFER and sub-account-linked EXPENSE
-  // transactions don't change the physical balance
-  const internalSums = await prisma.transaction.groupBy({
-    by: ['accountId'],
-    where: {
-      accountId: { in: accountsWithCategorizedTx.map(a => a.id) },
-      OR: [
-        { type: 'TRANSFER' },
-        { type: 'EXPENSE', subAccountEntryId: { not: null } },
-      ],
-    },
-    _sum: { amount: true },
-  })
-  const transferMap = new Map(internalSums.map(t => [t.accountId, t._sum.amount ?? 0]))
-
-  const categorizedAccountsBalance = accountsWithCategorizedTx.reduce(
-    (s, a) => s + a.currentBalance - (transferMap.get(a.id) ?? 0),
-    0,
-  )
+  // categorizedAccountsBalance: SUM(mainAmount) across accounts with sub-accounts
+  const accountIds = [...new Set(subAccounts.map(sa => sa.accountId))]
+  let categorizedAccountsBalance = 0
+  if (accountIds.length > 0) {
+    const placeholders = accountIds.map(() => '?').join(',')
+    const rows = await prisma.$queryRawUnsafe<Array<{ total: number }>>(
+      `SELECT SUM(COALESCE(mainAmount, 0)) as total FROM "Transaction" WHERE accountId IN (${placeholders})`,
+      ...accountIds,
+    )
+    categorizedAccountsBalance = rows[0]?.total ?? 0
+  }
 
   const result = subAccounts.map(sa => {
     const balance = sa.groups.reduce(

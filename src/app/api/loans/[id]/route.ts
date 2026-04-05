@@ -147,7 +147,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
           await tx.transaction.delete({ where: { id: t.id } })
           await tx.account.update({
             where: { id: t.accountId },
-            data: { currentBalance: { increment: -t.amount } },
+            data: { currentBalance: { increment: -((t.mainAmount ?? 0) + (t.subAmount ?? 0)) } },
           })
         }
       }
