@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Plus, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -42,6 +42,7 @@ export default function TransactionsPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(100)
   const [pendingDelete, setPendingDelete] = useState<{ id: string; loanPayment: LoanPaymentRef } | null>(null)
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const queryClient = useQueryClient()
 
   useEffect(() => {
@@ -71,6 +72,7 @@ export default function TransactionsPage() {
     onSuccess: (_, { revertLoan }) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
       if (revertLoan) queryClient.invalidateQueries({ queryKey: ['loans'] })
       setPendingDelete(null)
       toast.success('Transaktion gelöscht')
@@ -168,15 +170,25 @@ export default function TransactionsPage() {
                   {fmt(t.amount)}
                 </td>
                 <td className="p-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground hover:text-destructive h-7 px-2"
-                    onClick={() => handleDeleteClick(t)}
-                    disabled={deleteMutation.isPending}
-                  >
-                    ×
-                  </Button>
+                  <div className="flex items-center gap-1 justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-foreground h-7 px-2"
+                      onClick={() => setEditingTransaction(t)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive h-7 px-2"
+                      onClick={() => handleDeleteClick(t)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      ×
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -226,6 +238,11 @@ export default function TransactionsPage() {
       )}
 
       <TransactionFormDialog open={open} onOpenChange={setOpen} />
+      <TransactionFormDialog
+        open={!!editingTransaction}
+        onOpenChange={(v) => { if (!v) setEditingTransaction(null) }}
+        editTransaction={editingTransaction}
+      />
 
       {/* Dialog für Kreditraten-Transaktionen */}
       <Dialog open={!!pendingDelete} onOpenChange={v => !v && setPendingDelete(null)}>
