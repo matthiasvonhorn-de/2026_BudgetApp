@@ -182,6 +182,7 @@ export interface Loan {
     totalInterestPaid: number
     totalPrincipalPaid: number
     remainingBalance: number
+    currentBalance: number
     periodsPaid: number
     totalPeriods: number
     nextDueDate: string | null
