@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -9,9 +9,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AppSelect } from '@/components/ui/app-select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useSettingsStore } from '@/store/useSettingsStore'
-import type { MonthlySummary, GroupSpending, GroupSpendingData, BudgetData, BudgetGroup } from '@/types/api'
+import type { Account, MonthlySummary, GroupSpending, GroupSpendingData, BudgetData, BudgetGroup } from '@/types/api'
+
+const BUDGET_ACCOUNT_TYPES = ['CHECKING', 'SAVINGS', 'CREDIT_CARD', 'CASH']
 
 const MONTHS_DE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
@@ -83,6 +86,19 @@ export default function ReportsPage() {
   const now = new Date()
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
+
+  const { data: accounts = [] } = useQuery<Account[]>({
+    queryKey: ['accounts'],
+    queryFn: () => fetch('/api/accounts').then(r => r.json()),
+  })
+  const budgetAccounts = accounts.filter(a => a.isActive && BUDGET_ACCOUNT_TYPES.includes(a.type))
+
+  useEffect(() => {
+    if (!selectedAccountId && budgetAccounts.length > 0) {
+      setSelectedAccountId(budgetAccounts[0].id)
+    }
+  }, [budgetAccounts, selectedAccountId])
 
   const { data: monthlySummary = [] } = useQuery<MonthlySummary[]>({
     queryKey: ['reports-monthly-summary'],
@@ -90,8 +106,9 @@ export default function ReportsPage() {
   })
 
   const { data: groupSpendingData } = useQuery<GroupSpendingData>({
-    queryKey: ['reports-group-spending', selectedYear, selectedMonth],
-    queryFn: () => fetch(`/api/reports/category-spending?year=${selectedYear}&month=${selectedMonth}`).then(r => r.json()),
+    queryKey: ['reports-group-spending', selectedYear, selectedMonth, selectedAccountId],
+    queryFn: () => fetch(`/api/reports/category-spending?year=${selectedYear}&month=${selectedMonth}&accountId=${selectedAccountId}`).then(r => r.json()),
+    enabled: !!selectedAccountId,
   })
   const groupExpenses = groupSpendingData?.expenses ?? []
   const groupIncome = groupSpendingData?.income ?? []
@@ -108,8 +125,10 @@ export default function ReportsPage() {
     Ersparnis: Math.max(0, d.income - d.expenses),
   }))
 
-  // Budget vs. Ist data — negate budgeted/activity so expenses display as positive values
-  const budgetVsActualExpense = budgetData?.groups?.flatMap((g: BudgetGroup) =>
+  // Budget vs. Ist data — filter by selected account, negate for expenses
+  const accountGroups = budgetData?.groups?.filter((g: BudgetGroup) => g.accountId === selectedAccountId) ?? []
+
+  const budgetVsActualExpense = accountGroups.flatMap((g: BudgetGroup) =>
     g.categories
       .filter((c) => c.type === 'EXPENSE' && (c.budgeted !== 0 || c.activity !== 0))
       .map((c) => ({
@@ -118,10 +137,9 @@ export default function ReportsPage() {
         Vormonat: c.rolledOver,
         Ist: -c.activity,
       }))
-  ) ?? []
+  )
 
-  // Budget vs. Ist for income — both already positive
-  const budgetVsActualIncome = budgetData?.groups?.flatMap((g: BudgetGroup) =>
+  const budgetVsActualIncome = accountGroups.flatMap((g: BudgetGroup) =>
     g.categories
       .filter((c) => c.type === 'INCOME' && (c.budgeted !== 0 || c.activity !== 0))
       .map((c) => ({
@@ -130,7 +148,7 @@ export default function ReportsPage() {
         Vormonat: c.rolledOver,
         Ist: c.activity,
       }))
-  ) ?? []
+  )
 
   const totalIncome = monthlySummary.reduce((s: number, d: MonthlySummary) => s + d.income, 0) / (monthlySummary.length || 1)
   const totalExpenses = monthlySummary.reduce((s: number, d: MonthlySummary) => s + d.expenses, 0) / (monthlySummary.length || 1)
@@ -221,11 +239,20 @@ export default function ReportsPage() {
         <TabsContent value="kategorien" className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">Gruppenanalyse</h2>
-            <MonthYearSelector
-              year={selectedYear}
-              month={selectedMonth}
-              onChange={(y, m) => { setSelectedYear(y); setSelectedMonth(m) }}
-            />
+            <div className="flex gap-2 items-center">
+              <AppSelect
+                value={selectedAccountId ?? ''}
+                onValueChange={setSelectedAccountId}
+                options={budgetAccounts.map(a => ({ value: a.id, label: a.name }))}
+                placeholder="Konto"
+                className="w-48"
+              />
+              <MonthYearSelector
+                year={selectedYear}
+                month={selectedMonth}
+                onChange={(y, m) => { setSelectedYear(y); setSelectedMonth(m) }}
+              />
+            </div>
           </div>
 
           {groupExpenses.length === 0 && groupIncome.length === 0 ? (
@@ -375,11 +402,20 @@ export default function ReportsPage() {
         <TabsContent value="budget" className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">Budget vs. Ist</h2>
-            <MonthYearSelector
-              year={selectedYear}
-              month={selectedMonth}
-              onChange={(y, m) => { setSelectedYear(y); setSelectedMonth(m) }}
-            />
+            <div className="flex gap-2 items-center">
+              <AppSelect
+                value={selectedAccountId ?? ''}
+                onValueChange={setSelectedAccountId}
+                options={budgetAccounts.map(a => ({ value: a.id, label: a.name }))}
+                placeholder="Konto"
+                className="w-48"
+              />
+              <MonthYearSelector
+                year={selectedYear}
+                month={selectedMonth}
+                onChange={(y, m) => { setSelectedYear(y); setSelectedMonth(m) }}
+              />
+            </div>
           </div>
 
           {budgetVsActualExpense.length === 0 && budgetVsActualIncome.length === 0 ? (
