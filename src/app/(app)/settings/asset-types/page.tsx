@@ -28,8 +28,8 @@ export default function AssetTypesSettingsPage() {
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/asset-types/${id}`, { method: 'DELETE' })
       if (!res.ok) {
-        const body = await res.json().catch(() => ({ message: 'Fehler beim Löschen' }))
-        throw new Error(body.message ?? 'Fehler beim Löschen')
+        const body = await res.json().catch(() => ({ error: 'Fehler beim Löschen' }))
+        throw new Error(body.error ?? 'Fehler beim Löschen')
       }
       return res.json()
     },

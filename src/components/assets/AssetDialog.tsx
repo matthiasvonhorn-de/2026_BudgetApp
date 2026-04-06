@@ -149,6 +149,7 @@ export function AssetDialog({ open, onOpenChange, editAsset }: Props) {
               <Input
                 type="date"
                 value={form.purchaseDate}
+                max={new Date().toISOString().slice(0, 10)}
                 onChange={e => set('purchaseDate', e.target.value)}
               />
             </div>

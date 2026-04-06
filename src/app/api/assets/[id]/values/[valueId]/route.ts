@@ -7,7 +7,7 @@ import { roundCents } from '@/lib/money'
 
 const UpdateValueSchema = z.object({
   date: z.string().optional(),
-  value: z.number().optional(),
+  value: z.number().nonnegative().optional(),
   notes: z.string().nullable().optional(),
 })
 
