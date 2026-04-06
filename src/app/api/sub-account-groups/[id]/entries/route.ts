@@ -11,7 +11,7 @@ export const POST = withHandler(async (request: Request, ctx) => {
     description: z.string().min(1),
     amount: z.coerce.number(),
     fromBudget: z.boolean().default(false),
-    categoryId: z.string().min(1),
+    categoryId: z.string().min(1).optional(),
   }).parse(body)
 
   const result = await createLinkedEntry({
