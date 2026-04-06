@@ -273,6 +273,7 @@ export interface NetWorth {
   totalDebts: number
   netWorth: number
   totalPortfolios: number
+  totalRealAssets: number
 }
 
 // ── Portfolio ───────────────────────────────────────────────────────
@@ -297,6 +298,50 @@ export interface PortfolioDetail extends Portfolio {
 }
 
 export interface PortfolioValueEntry {
+  id: string
+  date: string
+  value: number
+  notes: string | null
+}
+
+// ── Asset (Sachwerte) ──────────────────────────────────────────────
+
+export interface AssetType {
+  id: string
+  name: string
+  icon: string
+  color: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+  _count?: { assets: number }
+}
+
+export interface Asset {
+  id: string
+  name: string
+  assetTypeId: string
+  color: string
+  ownershipPercent: number
+  purchaseDate: string
+  purchasePrice: number
+  notes: string | null
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  assetType: { id: string; name: string; icon: string; color: string }
+}
+
+export interface AssetListItem extends Asset {
+  currentValue: number | null
+  sparklineData: { date: string; value: number }[]
+}
+
+export interface AssetDetail extends Asset {
+  values: AssetValueEntry[]
+}
+
+export interface AssetValueEntry {
   id: string
   date: string
   value: number
