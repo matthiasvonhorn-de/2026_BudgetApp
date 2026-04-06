@@ -142,7 +142,16 @@ export const DELETE = withHandler(async (request: Request, ctx) => {
   })
 
   await prisma.$transaction(async (tx) => {
-    const pairedId = existing.transferToId
+    // Find paired transaction: either via transferToId (this is the source)
+    // or via reverse lookup (this is the target, another TX points to us)
+    let pairedId = existing.transferToId
+    if (!pairedId) {
+      const reverseRef = await tx.transaction.findFirst({
+        where: { transferToId: id },
+        select: { id: true },
+      })
+      pairedId = reverseRef?.id ?? null
+    }
 
     // Loan payment cleanup
     if (linkedPayment) {
@@ -175,6 +184,12 @@ export const DELETE = withHandler(async (request: Request, ctx) => {
     if (pairedId) {
       const paired = await tx.transaction.findUnique({ where: { id: pairedId } })
       if (paired) {
+        // Clean up entry on paired side
+        await deleteEntryFromTransaction(tx, paired.subAccountEntryId)
+        // Unlink transferToId if the paired TX holds the reference
+        if (paired.transferToId) {
+          await tx.transaction.update({ where: { id: pairedId }, data: { transferToId: null } })
+        }
         await tx.transaction.delete({ where: { id: pairedId } })
         const pairedEffect = (paired.mainAmount ?? 0) + (paired.subAmount ?? 0)
         await tx.account.update({

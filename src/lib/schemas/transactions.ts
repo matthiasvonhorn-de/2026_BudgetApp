@@ -17,6 +17,14 @@ export const createTransactionSchema = z.object({
   status: transactionStatus.default('PENDING'),
   skipSubAccountEntry: z.boolean().optional().default(false),
   skipPairedTransfer: z.boolean().optional().default(false),
+  // Transfer-specific fields
+  transferTargetAccountId: z.string().optional(),
+  transferTargetType: z.enum(['MAIN', 'SUB']).optional(),
+  transferTargetCategoryId: z.string().optional().nullable(),
+  transferTargetGroupId: z.string().optional(),
+  sourceType: z.enum(['MAIN', 'SUB']).optional(),
+  sourceGroupId: z.string().optional(),
+  sourceCategoryId: z.string().optional().nullable(),
 })
 
 export const updateTransactionSchema = z.object({

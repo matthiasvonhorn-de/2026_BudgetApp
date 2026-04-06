@@ -12,12 +12,14 @@ export const GET = withHandler(async (request: Request) => {
   const endOfMonth = new Date(year, month, 0, 23, 59, 59)
 
   const activityRows = await prisma.$queryRaw<Array<{ categoryId: string; total: number }>>`
-    SELECT t.categoryId, SUM(COALESCE(t.mainAmount, 0)) as total
+    SELECT t.categoryId, SUM(COALESCE(t.mainAmount, t.subAmount, 0)) as total
     FROM "Transaction" t
     JOIN Account a ON t.accountId = a.id
     WHERE t.date >= ${startOfMonth}
       AND t.date <= ${endOfMonth}
-      AND t.mainType = 'EXPENSE'
+      AND t.mainType != 'TRANSFER'
+      AND NOT (t.mainAmount IS NOT NULL AND t.subAmount IS NOT NULL)
+      AND COALESCE(t.mainAmount, t.subAmount, 0) < 0
       AND t.categoryId IS NOT NULL
       AND a.isActive = 1
       AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
