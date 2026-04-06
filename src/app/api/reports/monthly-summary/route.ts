@@ -18,27 +18,28 @@ export const GET = withHandler(async (request: Request) => {
 
     const [incomeRows, expenseRows] = await Promise.all([
       prisma.$queryRaw<[{ total: number | null }]>`
-        SELECT SUM(COALESCE(t.mainAmount, 0)) as total
+        SELECT SUM(COALESCE(t.mainAmount, t.subAmount, 0)) as total
         FROM "Transaction" t
         JOIN Account a ON t.accountId = a.id
         WHERE t.date >= ${startOfMonth}
           AND t.date <= ${endOfMonth}
-          AND t.mainType = 'INCOME'
-          AND t.mainAmount > 0
+          AND t.mainType != 'TRANSFER'
+          AND NOT (t.mainAmount IS NOT NULL AND t.subAmount IS NOT NULL)
+          AND COALESCE(t.mainAmount, t.subAmount, 0) > 0
           AND a.isActive = 1
           AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
-          AND t.subAmount IS NULL
       `,
       prisma.$queryRaw<[{ total: number | null }]>`
-        SELECT SUM(COALESCE(t.mainAmount, 0)) as total
+        SELECT SUM(COALESCE(t.mainAmount, t.subAmount, 0)) as total
         FROM "Transaction" t
         JOIN Account a ON t.accountId = a.id
         WHERE t.date >= ${startOfMonth}
           AND t.date <= ${endOfMonth}
-          AND t.mainType = 'EXPENSE'
+          AND t.mainType != 'TRANSFER'
+          AND NOT (t.mainAmount IS NOT NULL AND t.subAmount IS NOT NULL)
+          AND COALESCE(t.mainAmount, t.subAmount, 0) < 0
           AND a.isActive = 1
           AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
-          AND t.subAmount IS NULL
       `,
     ])
 
