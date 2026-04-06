@@ -12,7 +12,9 @@ export function withHandler(fn: RouteHandler): RouteHandler {
       return await fn(req, ctx)
     } catch (e) {
       if (e instanceof ZodError)
-        return NextResponse.json({ error: e.issues }, { status: 400 })
+        return NextResponse.json({
+          error: e.issues.map(i => ({ path: i.path.join('.'), message: i.message })),
+        }, { status: 400 })
       if (e instanceof DomainError)
         return NextResponse.json({ error: e.message }, { status: e.status })
       console.error(e)

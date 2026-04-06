@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { withHandler } from '@/lib/api/handler'
+import { DomainError } from '@/lib/api/errors'
+import { validateRegexPattern } from '@/lib/rules/validate-regex'
 
 const ruleSchema = z.object({
   name: z.string().min(1),
@@ -24,6 +26,12 @@ export const GET = withHandler(async () => {
 export const POST = withHandler(async (request: Request) => {
   const body = await request.json()
   const data = ruleSchema.parse(body)
+
+  if (data.operator === 'REGEX') {
+    const check = validateRegexPattern(data.value)
+    if (!check.valid) throw new DomainError(check.error!, 400)
+  }
+
   const rule = await prisma.categoryRule.create({
     data,
     include: { category: true },

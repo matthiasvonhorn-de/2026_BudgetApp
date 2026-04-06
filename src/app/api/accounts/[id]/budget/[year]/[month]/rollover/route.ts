@@ -130,7 +130,8 @@ export const POST = withHandler(async (req, ctx) => {
   let targetMonth = next.month
   let targetYear = next.year
 
-  while (currentRollovers.length > 0) {
+  const MAX_CASCADE_DEPTH = 60 // max 5 years forward
+  while (currentRollovers.length > 0 && cascadedMonths < MAX_CASCADE_DEPTH) {
     const categoryIds = currentRollovers.map(r => r.categoryId)
 
     // Check which categories have entries in the target month
