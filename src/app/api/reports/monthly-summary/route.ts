@@ -4,7 +4,7 @@ import { withHandler } from '@/lib/api/handler'
 
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
-  const months = parseInt(searchParams.get('months') ?? '12')
+  const months = Math.min(Math.max(parseInt(searchParams.get('months') ?? '12') || 12, 1), 120)
 
   const now = new Date()
   const results = []

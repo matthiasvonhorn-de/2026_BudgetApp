@@ -5,7 +5,7 @@ import { withHandler } from '@/lib/api/handler'
 export const GET = withHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
   const accountId = searchParams.get('accountId')
-  const months = parseInt(searchParams.get('months') ?? '12')
+  const months = Math.min(Math.max(parseInt(searchParams.get('months') ?? '12') || 12, 1), 120)
 
   if (!accountId) {
     return NextResponse.json({ error: 'accountId required' }, { status: 400 })
