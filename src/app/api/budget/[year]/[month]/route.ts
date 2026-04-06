@@ -32,9 +32,10 @@ export const GET = withHandler(async (_, ctx) => {
 
   const accountFilter = { isActive: true, type: { notIn: ['SPARPLAN', 'FESTGELD'] as AccountType[] } }
 
-  // Alle Transaktionen dieses Monats aggregiert nach Kategorie: SUM(mainAmount + subAmount)
+  // Alle Transaktionen dieses Monats aggregiert nach Kategorie
+  // Transfers und dual-sided TX (main+sub gefüllt) ausschließen
   const activityRows = await prisma.$queryRaw<Array<{ categoryId: string; total: number }>>`
-    SELECT t.categoryId, SUM(COALESCE(t.mainAmount, 0) + COALESCE(t.subAmount, 0)) as total
+    SELECT t.categoryId, SUM(COALESCE(t.mainAmount, 0)) as total
     FROM "Transaction" t
     JOIN Account a ON t.accountId = a.id
     WHERE t.date >= ${startOfMonth}

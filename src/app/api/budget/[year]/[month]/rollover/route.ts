@@ -25,12 +25,15 @@ export const POST = withHandler(async (_, ctx) => {
   const budgetMap = new Map(budgetEntries.map(e => [e.categoryId, e]))
 
   const activityRows = await prisma.$queryRaw<Array<{ categoryId: string; total: number }>>`
-    SELECT categoryId, SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
-    FROM "Transaction"
-    WHERE date >= ${startOfMonth}
-      AND date <= ${endOfMonth}
-      AND categoryId IS NOT NULL
-    GROUP BY categoryId
+    SELECT t.categoryId, SUM(COALESCE(t.mainAmount, 0)) as total
+    FROM "Transaction" t
+    JOIN Account a ON t.accountId = a.id
+    WHERE t.date >= ${startOfMonth}
+      AND t.date <= ${endOfMonth}
+      AND t.categoryId IS NOT NULL
+      AND a.isActive = 1
+      AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+    GROUP BY t.categoryId
   `
   const activityMap = new Map(activityRows.map(a => [a.categoryId, a.total]))
 

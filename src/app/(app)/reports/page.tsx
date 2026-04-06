@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useSettingsStore } from '@/store/useSettingsStore'
-import type { MonthlySummary, CategorySpending, BudgetData, BudgetGroup } from '@/types/api'
+import type { MonthlySummary, GroupSpending, GroupSpendingData, BudgetData, BudgetGroup } from '@/types/api'
 
 const MONTHS_DE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
@@ -89,10 +89,12 @@ export default function ReportsPage() {
     queryFn: () => fetch('/api/reports/monthly-summary?months=12').then(r => r.json()),
   })
 
-  const { data: categorySpending = [] } = useQuery<CategorySpending[]>({
-    queryKey: ['reports-category-spending', selectedYear, selectedMonth],
+  const { data: groupSpendingData } = useQuery<GroupSpendingData>({
+    queryKey: ['reports-group-spending', selectedYear, selectedMonth],
     queryFn: () => fetch(`/api/reports/category-spending?year=${selectedYear}&month=${selectedMonth}`).then(r => r.json()),
   })
+  const groupExpenses = groupSpendingData?.expenses ?? []
+  const groupIncome = groupSpendingData?.income ?? []
 
   const { data: budgetData } = useQuery<BudgetData>({
     queryKey: ['budget', selectedYear, selectedMonth],
@@ -106,14 +108,27 @@ export default function ReportsPage() {
     Ersparnis: Math.max(0, d.income - d.expenses),
   }))
 
-  // Budget vs. Ist data
-  const budgetVsActual = budgetData?.groups?.flatMap((g: BudgetGroup) =>
+  // Budget vs. Ist data — negate budgeted/activity so expenses display as positive values
+  const budgetVsActualExpense = budgetData?.groups?.flatMap((g: BudgetGroup) =>
     g.categories
-      .filter((c) => c.type === 'EXPENSE' && (c.budgeted > 0 || Math.abs(c.activity) > 0))
+      .filter((c) => c.type === 'EXPENSE' && (c.budgeted !== 0 || c.activity !== 0))
+      .map((c) => ({
+        name: c.name,
+        Budget: -c.budgeted,
+        Vormonat: c.rolledOver,
+        Ist: -c.activity,
+      }))
+  ) ?? []
+
+  // Budget vs. Ist for income — both already positive
+  const budgetVsActualIncome = budgetData?.groups?.flatMap((g: BudgetGroup) =>
+    g.categories
+      .filter((c) => c.type === 'INCOME' && (c.budgeted !== 0 || c.activity !== 0))
       .map((c) => ({
         name: c.name,
         Budget: c.budgeted,
-        Ist: Math.abs(c.activity),
+        Vormonat: c.rolledOver,
+        Ist: c.activity,
       }))
   ) ?? []
 
@@ -127,7 +142,7 @@ export default function ReportsPage() {
       <Tabs defaultValue="monatsübersicht">
         <TabsList className="mb-6">
           <TabsTrigger value="monatsübersicht">Monatsübersicht</TabsTrigger>
-          <TabsTrigger value="kategorien">Kategorienanalyse</TabsTrigger>
+          <TabsTrigger value="kategorien">Gruppenanalyse</TabsTrigger>
           <TabsTrigger value="budget">Budget vs. Ist</TabsTrigger>
         </TabsList>
 
@@ -202,10 +217,10 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
 
-        {/* Tab 2: Kategorienanalyse */}
+        {/* Tab 2: Gruppenanalyse */}
         <TabsContent value="kategorien" className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Ausgaben nach Kategorie</h2>
+            <h2 className="text-base font-semibold">Gruppenanalyse</h2>
             <MonthYearSelector
               year={selectedYear}
               month={selectedMonth}
@@ -213,82 +228,153 @@ export default function ReportsPage() {
             />
           </div>
 
-          {categorySpending.length === 0 ? (
+          {groupExpenses.length === 0 && groupIncome.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
-                Keine Ausgaben in diesem Monat
+                Keine Daten für diesen Monat
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Verteilung</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <PieChart>
-                      <Pie
-                        data={categorySpending}
-                        dataKey="amount"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={100}
-                        innerRadius={50}
-                        paddingAngle={2}
-                      >
-                        {categorySpending.map((entry: CategorySpending) => (
-                          <Cell key={entry.categoryId} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip content={<CustomTooltipPie />} />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+            <>
+              {/* Einnahmen */}
+              {groupIncome.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Einnahmen — Verteilung</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <PieChart>
+                          <Pie
+                            data={groupIncome}
+                            dataKey="amount"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            innerRadius={50}
+                            paddingAngle={2}
+                          >
+                            {groupIncome.map((entry: GroupSpending) => (
+                              <Cell key={entry.groupId} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<CustomTooltipPie />} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {categorySpending.map((cat: CategorySpending) => {
-                    const total = categorySpending.reduce((s: number, c: CategorySpending) => s + c.amount, 0)
-                    const pct = total > 0 ? (cat.amount / total) * 100 : 0
-                    return (
-                      <div key={cat.categoryId}>
-                        <div className="flex items-center justify-between text-sm mb-1">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
-                            <span>{cat.name}</span>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Einnahmen — Übersicht</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {groupIncome.map((group: GroupSpending) => {
+                        const total = groupIncome.reduce((s: number, g: GroupSpending) => s + g.amount, 0)
+                        const pct = total > 0 ? (group.amount / total) * 100 : 0
+                        return (
+                          <div key={group.groupId}>
+                            <div className="flex items-center justify-between text-sm mb-1">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color }} />
+                                <span>{group.name}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-muted-foreground text-xs">{pct.toFixed(0)}%</span>
+                                <span className="font-medium">{fmt(group.amount)}</span>
+                              </div>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: group.color }} />
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-muted-foreground text-xs">{pct.toFixed(0)}%</span>
-                            <span className="font-medium">{fmt(cat.amount)}</span>
-                          </div>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cat.color }} />
-                        </div>
+                        )
+                      })}
+                      <div className="border-t pt-2 flex justify-between text-sm font-semibold">
+                        <span>Gesamt</span>
+                        <span>{fmt(groupIncome.reduce((s: number, g: GroupSpending) => s + g.amount, 0))}</span>
                       </div>
-                    )
-                  })}
-                  <div className="border-t pt-2 flex justify-between text-sm font-semibold">
-                    <span>Gesamt</span>
-                    <span>{fmt(categorySpending.reduce((s: number, c: CategorySpending) => s + c.amount, 0))}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Ausgaben */}
+              {groupExpenses.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Ausgaben — Verteilung</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <PieChart>
+                          <Pie
+                            data={groupExpenses}
+                            dataKey="amount"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            innerRadius={50}
+                            paddingAngle={2}
+                          >
+                            {groupExpenses.map((entry: GroupSpending) => (
+                              <Cell key={entry.groupId} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip content={<CustomTooltipPie />} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Ausgaben — Übersicht</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {groupExpenses.map((group: GroupSpending) => {
+                        const total = groupExpenses.reduce((s: number, g: GroupSpending) => s + g.amount, 0)
+                        const pct = total > 0 ? (group.amount / total) * 100 : 0
+                        return (
+                          <div key={group.groupId}>
+                            <div className="flex items-center justify-between text-sm mb-1">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: group.color }} />
+                                <span>{group.name}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-muted-foreground text-xs">{pct.toFixed(0)}%</span>
+                                <span className="font-medium">{fmt(group.amount)}</span>
+                              </div>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: group.color }} />
+                            </div>
+                          </div>
+                        )
+                      })}
+                      <div className="border-t pt-2 flex justify-between text-sm font-semibold">
+                        <span>Gesamt</span>
+                        <span>{fmt(groupExpenses.reduce((s: number, g: GroupSpending) => s + g.amount, 0))}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </>
           )}
         </TabsContent>
 
         {/* Tab 3: Budget vs. Ist */}
         <TabsContent value="budget" className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Budget vs. tatsächliche Ausgaben</h2>
+            <h2 className="text-base font-semibold">Budget vs. Ist</h2>
             <MonthYearSelector
               year={selectedYear}
               month={selectedMonth}
@@ -296,7 +382,7 @@ export default function ReportsPage() {
             />
           </div>
 
-          {budgetVsActual.length === 0 ? (
+          {budgetVsActualExpense.length === 0 && budgetVsActualIncome.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 Keine Budgetdaten für diesen Monat
@@ -304,57 +390,125 @@ export default function ReportsPage() {
             </Card>
           ) : (
             <>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Budget vs. Ist</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={Math.max(280, budgetVsActual.length * 40)}>
-                    <BarChart data={budgetVsActual} layout="vertical" margin={{ top: 5, right: 10, left: 80, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={76} />
-                      <Tooltip content={<CustomTooltipBar />} />
-                      <Legend />
-                      <Bar dataKey="Budget" fill="#6366f1" radius={[0, 3, 3, 0]} />
-                      <Bar dataKey="Ist" fill="#f59e0b" radius={[0, 3, 3, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              {/* Ausgaben */}
+              {budgetVsActualExpense.length > 0 && (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Ausgaben</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={Math.max(280, budgetVsActualExpense.length * 40)}>
+                        <BarChart data={budgetVsActualExpense} layout="vertical" margin={{ top: 5, right: 10, left: 80, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
+                          <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={76} />
+                          <Tooltip content={<CustomTooltipBar />} />
+                          <Legend />
+                          <Bar dataKey="Budget" stackId="budget" fill="#6366f1" />
+                          <Bar dataKey="Vormonat" stackId="budget" fill="#a5b4fc" radius={[0, 3, 3, 0]} />
+                          <Bar dataKey="Ist" fill="#f59e0b" radius={[0, 3, 3, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Tabelle</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-muted-foreground">
-                        <th className="text-left py-2">Kategorie</th>
-                        <th className="text-right py-2">Budget</th>
-                        <th className="text-right py-2">Ist</th>
-                        <th className="text-right py-2">Differenz</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {budgetVsActual.map((row: { name: string; Budget: number; Ist: number }) => {
-                        const diff = row.Budget - row.Ist
-                        return (
-                          <tr key={row.name} className="border-b">
-                            <td className="py-2">{row.name}</td>
-                            <td className="text-right py-2">{fmt(row.Budget)}</td>
-                            <td className="text-right py-2">{fmt(row.Ist)}</td>
-                            <td className={`text-right py-2 font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
-                              {diff >= 0 ? '+' : ''}{fmt(diff)}
-                            </td>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Ausgaben — Tabelle</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-muted-foreground">
+                            <th className="text-left py-2">Kategorie</th>
+                            <th className="text-right py-2">Budget</th>
+                            <th className="text-right py-2">Vormonat</th>
+                            <th className="text-right py-2">Ist</th>
+                            <th className="text-right py-2">Differenz</th>
                           </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </CardContent>
-              </Card>
+                        </thead>
+                        <tbody>
+                          {budgetVsActualExpense.map((row: { name: string; Budget: number; Vormonat: number; Ist: number }) => {
+                            const diff = row.Budget + row.Vormonat - row.Ist
+                            return (
+                              <tr key={row.name} className="border-b">
+                                <td className="py-2">{row.name}</td>
+                                <td className="text-right py-2">{fmt(row.Budget)}</td>
+                                <td className="text-right py-2">{row.Vormonat !== 0 ? fmt(row.Vormonat) : '—'}</td>
+                                <td className="text-right py-2">{fmt(row.Ist)}</td>
+                                <td className={`text-right py-2 font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                                  {diff >= 0 ? '+' : ''}{fmt(diff)}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+
+              {/* Einnahmen */}
+              {budgetVsActualIncome.length > 0 && (
+                <>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Einnahmen</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={Math.max(200, budgetVsActualIncome.length * 40)}>
+                        <BarChart data={budgetVsActualIncome} layout="vertical" margin={{ top: 5, right: 10, left: 80, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11 }} />
+                          <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={76} />
+                          <Tooltip content={<CustomTooltipBar />} />
+                          <Legend />
+                          <Bar dataKey="Budget" stackId="budget" fill="#6366f1" />
+                          <Bar dataKey="Vormonat" stackId="budget" fill="#a5b4fc" radius={[0, 3, 3, 0]} />
+                          <Bar dataKey="Ist" fill="#10b981" radius={[0, 3, 3, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Einnahmen — Tabelle</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b text-muted-foreground">
+                            <th className="text-left py-2">Kategorie</th>
+                            <th className="text-right py-2">Budget</th>
+                            <th className="text-right py-2">Vormonat</th>
+                            <th className="text-right py-2">Ist</th>
+                            <th className="text-right py-2">Differenz</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {budgetVsActualIncome.map((row: { name: string; Budget: number; Vormonat: number; Ist: number }) => {
+                            const diff = row.Ist - row.Budget - row.Vormonat
+                            return (
+                              <tr key={row.name} className="border-b">
+                                <td className="py-2">{row.name}</td>
+                                <td className="text-right py-2">{fmt(row.Budget)}</td>
+                                <td className="text-right py-2">{row.Vormonat !== 0 ? fmt(row.Vormonat) : '—'}</td>
+                                <td className="text-right py-2">{fmt(row.Ist)}</td>
+                                <td className={`text-right py-2 font-medium ${diff >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                                  {diff >= 0 ? '+' : ''}{fmt(diff)}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </>
           )}
         </TabsContent>
