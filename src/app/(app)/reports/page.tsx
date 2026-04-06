@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line,
+  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, ReferenceLine,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -76,6 +76,40 @@ function CustomTooltipPie({ active, payload }: any) {
       <p className="font-medium">{payload[0].name}</p>
       <p>{fmt(payload[0].value)}</p>
     </div>
+  )
+}
+
+function BalanceAreaChart({
+  data, dataKey, stroke, height = 280, id,
+}: { data: Array<Record<string, unknown>>; dataKey: string; stroke: string; height?: number; id: string }) {
+  const fmt = useFormatCurrency()
+  const fmtCompact = (v: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', notation: 'compact', maximumFractionDigits: 1 }).format(v)
+
+  const values = data.map(d => d[dataKey] as number)
+  const max = Math.max(...values, 0)
+  const min = Math.min(...values, 0)
+  const range = max - min
+  const offset = range > 0 ? max / range : 0.5
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <AreaChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+        <defs>
+          <linearGradient id={`grad-${id}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset={0} stopColor="#10b981" stopOpacity={0.15} />
+            <stop offset={offset} stopColor="#10b981" stopOpacity={0.05} />
+            <stop offset={offset} stopColor="#ef4444" stopOpacity={0.05} />
+            <stop offset={1} stopColor="#ef4444" stopOpacity={0.15} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+        <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
+        <Tooltip content={<CustomTooltipBar />} />
+        <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="3 3" />
+        <Area type="monotone" dataKey={dataKey} stroke={stroke} strokeWidth={2} fill={`url(#grad-${id})`} dot={{ r: 3 }} />
+      </AreaChart>
+    </ResponsiveContainer>
   )
 }
 
@@ -217,16 +251,7 @@ export default function ReportsPage() {
                   <CardTitle className="text-base">Gesamtsaldo im Verlauf</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={balanceChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
-                      <Tooltip content={<CustomTooltipBar />} />
-                      <Legend />
-                      <Line type="monotone" dataKey="Gesamt" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <BalanceAreaChart data={balanceChartData} dataKey="Gesamt" stroke="#6366f1" id="gesamt" />
                 </CardContent>
               </Card>
 
@@ -235,16 +260,7 @@ export default function ReportsPage() {
                   <CardTitle className="text-base">Saldo Hauptkonto im Verlauf</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={balanceChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
-                      <Tooltip content={<CustomTooltipBar />} />
-                      <Legend />
-                      <Line type="monotone" dataKey="Hauptkonto" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <BalanceAreaChart data={balanceChartData} dataKey="Hauptkonto" stroke="#10b981" id="hauptkonto" />
                 </CardContent>
               </Card>
 
@@ -253,16 +269,7 @@ export default function ReportsPage() {
                   <CardTitle className="text-base">Saldo Unterkonten im Verlauf</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={balanceChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
-                      <Tooltip content={<CustomTooltipBar />} />
-                      <Legend />
-                      <Line type="monotone" dataKey="Unterkonten" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <BalanceAreaChart data={balanceChartData} dataKey="Unterkonten" stroke="#f59e0b" id="unterkonten" />
                 </CardContent>
               </Card>
 
@@ -272,15 +279,7 @@ export default function ReportsPage() {
                     <CardTitle className="text-base">{gc.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <LineChart data={gc.data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                        <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
-                        <Tooltip content={<CustomTooltipBar />} />
-                        <Line type="monotone" dataKey="Saldo" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <BalanceAreaChart data={gc.data} dataKey="Saldo" stroke="#6366f1" height={200} id={`grp-${gc.groupId}`} />
                   </CardContent>
                 </Card>
               ))}
