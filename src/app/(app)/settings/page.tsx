@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { BookOpen, SlidersHorizontal, Tag, TrendingDown, TrendingUp } from 'lucide-react'
+import { BookOpen, Landmark, SlidersHorizontal, Tag, TrendingDown, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const settingsItems = [
@@ -34,6 +34,12 @@ const settingsItems = [
     icon: TrendingUp,
     title: 'Aktiendepots',
     description: 'Depots anlegen und verwalten',
+  },
+  {
+    href: '/settings/asset-types',
+    icon: Landmark,
+    title: 'Sachwert-Typen',
+    description: 'Typen für Sachwerte verwalten (Immobilien, Fahrzeuge, etc.)',
   },
 ]
 
