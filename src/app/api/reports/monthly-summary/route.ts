@@ -27,6 +27,7 @@ export const GET = withHandler(async (request: Request) => {
           AND t.mainAmount > 0
           AND a.isActive = 1
           AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+          AND t.subAmount IS NULL
       `,
       prisma.$queryRaw<[{ total: number | null }]>`
         SELECT SUM(COALESCE(t.mainAmount, 0)) as total
@@ -37,6 +38,7 @@ export const GET = withHandler(async (request: Request) => {
           AND t.mainType = 'EXPENSE'
           AND a.isActive = 1
           AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+          AND t.subAmount IS NULL
       `,
     ])
 

@@ -21,6 +21,7 @@ export const GET = withHandler(async (request: Request) => {
       AND t.categoryId IS NOT NULL
       AND a.isActive = 1
       AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+      AND t.subAmount IS NULL
     GROUP BY t.categoryId
   `
 
