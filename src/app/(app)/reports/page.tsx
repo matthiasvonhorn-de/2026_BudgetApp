@@ -1,17 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line,
+  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, ReferenceLine,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AppSelect } from '@/components/ui/app-select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useSettingsStore } from '@/store/useSettingsStore'
-import type { MonthlySummary, GroupSpending, GroupSpendingData, BudgetData, BudgetGroup } from '@/types/api'
+import type { Account, AccountBalanceMonth, MonthlySummary, GroupSpending, GroupSpendingData, BudgetData, BudgetGroup } from '@/types/api'
+
+const BUDGET_ACCOUNT_TYPES = ['CHECKING', 'SAVINGS', 'CREDIT_CARD', 'CASH']
 
 const MONTHS_DE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
@@ -76,6 +79,40 @@ function CustomTooltipPie({ active, payload }: any) {
   )
 }
 
+function BalanceAreaChart({
+  data, dataKey, stroke, height = 280, id,
+}: { data: Array<Record<string, unknown>>; dataKey: string; stroke: string; height?: number; id: string }) {
+  const fmt = useFormatCurrency()
+  const fmtCompact = (v: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', notation: 'compact', maximumFractionDigits: 1 }).format(v)
+
+  const values = data.map(d => d[dataKey] as number)
+  const max = Math.max(...values, 0)
+  const min = Math.min(...values, 0)
+  const range = max - min
+  const offset = range > 0 ? max / range : 0.5
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <AreaChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+        <defs>
+          <linearGradient id={`grad-${id}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset={0} stopColor="#10b981" stopOpacity={0.15} />
+            <stop offset={offset} stopColor="#10b981" stopOpacity={0.05} />
+            <stop offset={offset} stopColor="#ef4444" stopOpacity={0.05} />
+            <stop offset={1} stopColor="#ef4444" stopOpacity={0.15} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+        <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
+        <Tooltip content={<CustomTooltipBar />} />
+        <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="3 3" />
+        <Area type="monotone" dataKey={dataKey} stroke={stroke} strokeWidth={2} fill={`url(#grad-${id})`} dot={{ r: 3 }} />
+      </AreaChart>
+    </ResponsiveContainer>
+  )
+}
+
 export default function ReportsPage() {
   const fmt = useFormatCurrency()
   const { locale, currency } = useSettingsStore()
@@ -83,6 +120,19 @@ export default function ReportsPage() {
   const now = new Date()
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
+
+  const { data: accounts = [] } = useQuery<Account[]>({
+    queryKey: ['accounts'],
+    queryFn: () => fetch('/api/accounts').then(r => r.json()),
+  })
+  const budgetAccounts = accounts.filter(a => a.isActive && BUDGET_ACCOUNT_TYPES.includes(a.type))
+
+  useEffect(() => {
+    if (!selectedAccountId && budgetAccounts.length > 0) {
+      setSelectedAccountId(budgetAccounts[0].id)
+    }
+  }, [budgetAccounts, selectedAccountId])
 
   const { data: monthlySummary = [] } = useQuery<MonthlySummary[]>({
     queryKey: ['reports-monthly-summary'],
@@ -90,8 +140,9 @@ export default function ReportsPage() {
   })
 
   const { data: groupSpendingData } = useQuery<GroupSpendingData>({
-    queryKey: ['reports-group-spending', selectedYear, selectedMonth],
-    queryFn: () => fetch(`/api/reports/category-spending?year=${selectedYear}&month=${selectedMonth}`).then(r => r.json()),
+    queryKey: ['reports-group-spending', selectedYear, selectedMonth, selectedAccountId],
+    queryFn: () => fetch(`/api/reports/category-spending?year=${selectedYear}&month=${selectedMonth}&accountId=${selectedAccountId}`).then(r => r.json()),
+    enabled: !!selectedAccountId,
   })
   const groupExpenses = groupSpendingData?.expenses ?? []
   const groupIncome = groupSpendingData?.income ?? []
@@ -101,6 +152,32 @@ export default function ReportsPage() {
     queryFn: () => fetch(`/api/budget/${selectedYear}/${selectedMonth}`).then(r => r.json()),
   })
 
+  const { data: accountBalance = [] } = useQuery<AccountBalanceMonth[]>({
+    queryKey: ['reports-account-balance', selectedAccountId],
+    queryFn: () => fetch(`/api/reports/account-balance?accountId=${selectedAccountId}&months=12`).then(r => r.json()),
+    enabled: !!selectedAccountId,
+  })
+
+  const balanceChartData = accountBalance.map((d) => ({
+    name: `${MONTHS_DE[d.month - 1]} ${d.year !== now.getFullYear() ? d.year : ''}`.trim(),
+    Gesamt: d.totalBalance,
+    Hauptkonto: d.mainBalance,
+    Unterkonten: d.subBalance,
+  }))
+
+  // Unique sub-account groups with time series data
+  const groupIds = accountBalance.length > 0
+    ? [...new Map(accountBalance[0].groups.map(g => [g.groupId, g])).values()]
+    : []
+  const groupCharts = groupIds.map(g => ({
+    groupId: g.groupId,
+    title: `${g.subAccountName} — ${g.groupName}`,
+    data: accountBalance.map(m => ({
+      name: `${MONTHS_DE[m.month - 1]} ${m.year !== now.getFullYear() ? m.year : ''}`.trim(),
+      Saldo: m.groups.find(gg => gg.groupId === g.groupId)?.balance ?? 0,
+    })),
+  }))
+
   const chartData = monthlySummary.map((d: MonthlySummary) => ({
     name: `${MONTHS_DE[d.month - 1]} ${d.year !== now.getFullYear() ? d.year : ''}`.trim(),
     Einnahmen: d.income,
@@ -108,8 +185,10 @@ export default function ReportsPage() {
     Ersparnis: Math.max(0, d.income - d.expenses),
   }))
 
-  // Budget vs. Ist data — negate budgeted/activity so expenses display as positive values
-  const budgetVsActualExpense = budgetData?.groups?.flatMap((g: BudgetGroup) =>
+  // Budget vs. Ist data — filter by selected account, negate for expenses
+  const accountGroups = budgetData?.groups?.filter((g: BudgetGroup) => g.accountId === selectedAccountId) ?? []
+
+  const budgetVsActualExpense = accountGroups.flatMap((g: BudgetGroup) =>
     g.categories
       .filter((c) => c.type === 'EXPENSE' && (c.budgeted !== 0 || c.activity !== 0))
       .map((c) => ({
@@ -118,10 +197,9 @@ export default function ReportsPage() {
         Vormonat: c.rolledOver,
         Ist: -c.activity,
       }))
-  ) ?? []
+  )
 
-  // Budget vs. Ist for income — both already positive
-  const budgetVsActualIncome = budgetData?.groups?.flatMap((g: BudgetGroup) =>
+  const budgetVsActualIncome = accountGroups.flatMap((g: BudgetGroup) =>
     g.categories
       .filter((c) => c.type === 'INCOME' && (c.budgeted !== 0 || c.activity !== 0))
       .map((c) => ({
@@ -130,7 +208,7 @@ export default function ReportsPage() {
         Vormonat: c.rolledOver,
         Ist: c.activity,
       }))
-  ) ?? []
+  )
 
   const totalIncome = monthlySummary.reduce((s: number, d: MonthlySummary) => s + d.income, 0) / (monthlySummary.length || 1)
   const totalExpenses = monthlySummary.reduce((s: number, d: MonthlySummary) => s + d.expenses, 0) / (monthlySummary.length || 1)
@@ -139,15 +217,78 @@ export default function ReportsPage() {
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Berichte</h1>
 
-      <Tabs defaultValue="monatsübersicht">
+      <Tabs defaultValue="gesamtübersicht">
         <TabsList className="mb-6">
-          <TabsTrigger value="monatsübersicht">Monatsübersicht</TabsTrigger>
+          <TabsTrigger value="gesamtübersicht">Gesamtübersicht</TabsTrigger>
+          <TabsTrigger value="monat">Monatsübersicht</TabsTrigger>
           <TabsTrigger value="kategorien">Gruppenanalyse</TabsTrigger>
           <TabsTrigger value="budget">Budget vs. Ist</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Monatsübersicht */}
-        <TabsContent value="monatsübersicht" className="space-y-6">
+        {/* Tab 2: Monatsübersicht — Saldenbericht pro Konto */}
+        <TabsContent value="monat" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Monatsübersicht</h2>
+            <AppSelect
+              value={selectedAccountId ?? ''}
+              onValueChange={setSelectedAccountId}
+              options={budgetAccounts.map(a => ({ value: a.id, label: a.name }))}
+              placeholder="Konto"
+              className="w-48"
+            />
+          </div>
+
+          {balanceChartData.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Keine Daten für dieses Konto
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Gesamtsaldo im Verlauf</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BalanceAreaChart data={balanceChartData} dataKey="Gesamt" stroke="#6366f1" id="gesamt" />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Saldo Hauptkonto im Verlauf</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BalanceAreaChart data={balanceChartData} dataKey="Hauptkonto" stroke="#10b981" id="hauptkonto" />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Saldo Unterkonten im Verlauf</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BalanceAreaChart data={balanceChartData} dataKey="Unterkonten" stroke="#f59e0b" id="unterkonten" />
+                </CardContent>
+              </Card>
+
+              {groupCharts.map((gc) => (
+                <Card key={gc.groupId}>
+                  <CardHeader>
+                    <CardTitle className="text-base">{gc.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <BalanceAreaChart data={gc.data} dataKey="Saldo" stroke="#6366f1" height={200} id={`grp-${gc.groupId}`} />
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          )}
+        </TabsContent>
+
+        {/* Tab 1: Gesamtübersicht */}
+        <TabsContent value="gesamtübersicht" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="pb-2">
@@ -221,11 +362,20 @@ export default function ReportsPage() {
         <TabsContent value="kategorien" className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">Gruppenanalyse</h2>
-            <MonthYearSelector
-              year={selectedYear}
-              month={selectedMonth}
-              onChange={(y, m) => { setSelectedYear(y); setSelectedMonth(m) }}
-            />
+            <div className="flex gap-2 items-center">
+              <AppSelect
+                value={selectedAccountId ?? ''}
+                onValueChange={setSelectedAccountId}
+                options={budgetAccounts.map(a => ({ value: a.id, label: a.name }))}
+                placeholder="Konto"
+                className="w-48"
+              />
+              <MonthYearSelector
+                year={selectedYear}
+                month={selectedMonth}
+                onChange={(y, m) => { setSelectedYear(y); setSelectedMonth(m) }}
+              />
+            </div>
           </div>
 
           {groupExpenses.length === 0 && groupIncome.length === 0 ? (
@@ -375,11 +525,20 @@ export default function ReportsPage() {
         <TabsContent value="budget" className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">Budget vs. Ist</h2>
-            <MonthYearSelector
-              year={selectedYear}
-              month={selectedMonth}
-              onChange={(y, m) => { setSelectedYear(y); setSelectedMonth(m) }}
-            />
+            <div className="flex gap-2 items-center">
+              <AppSelect
+                value={selectedAccountId ?? ''}
+                onValueChange={setSelectedAccountId}
+                options={budgetAccounts.map(a => ({ value: a.id, label: a.name }))}
+                placeholder="Konto"
+                className="w-48"
+              />
+              <MonthYearSelector
+                year={selectedYear}
+                month={selectedMonth}
+                onChange={(y, m) => { setSelectedYear(y); setSelectedMonth(m) }}
+              />
+            </div>
           </div>
 
           {budgetVsActualExpense.length === 0 && budgetVsActualIncome.length === 0 ? (

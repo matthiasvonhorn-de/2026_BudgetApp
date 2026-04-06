@@ -209,8 +209,8 @@ function EditCategoryForm({
   const [rolloverEnabled, setRolloverEnabled] = useState(category.rolloverEnabled ?? true)
 
   const { data: subAccountGroups = [] } = useQuery<(SubAccountGroup & { id: string })[]>({
-    queryKey: ['sub-account-groups'],
-    queryFn: () => fetch('/api/sub-account-groups').then(r => r.json()),
+    queryKey: ['sub-account-groups', accountId],
+    queryFn: () => fetch(`/api/sub-account-groups?accountId=${accountId}`).then(r => r.json()),
   })
 
   const updateCat = useMutation({
