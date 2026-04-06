@@ -114,12 +114,16 @@ Spec-driven development: before any implementation, first work out a specificati
 - Never leave uncommitted changes when done
 
 ### 3. PR — create as Draft after the first push
+- ALWAYS `git push` BEFORE running `gh pr create` — unpushed commits cause errors
+- Check if an open PR for the branch already exists before creating a new one: `gh pr list --state open --head <branch>`
+- If a prior PR was merged, create a new one for the new commits
 - `gh pr create --draft` immediately after the first commit on the branch
 - Status **Draft** = work in progress
 
 ### 4. Ready for Review — only when the user explicitly says so
 - Examples: "PR ist fertig", "stell den PR bereit", "ready for review"
 - Never set automatically — always wait for explicit instruction
+- ALWAYS `git push` before `gh pr ready` to ensure all commits are remote
 - `gh pr ready <number>` or via GitHub MCP
 
 ### 5. Merge — the user merges in GitHub themselves
