@@ -14,6 +14,7 @@ import {
   Wallet,
   Moon,
   Sun,
+  Landmark,
 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
@@ -23,6 +24,7 @@ const navItems = [
   { href: '/accounts', label: 'Konten', icon: CreditCard },
   { href: '/loans', label: 'Bankkredite', icon: TrendingDown },
   { href: '/portfolios', label: 'Aktiendepots', icon: TrendingUp },
+  { href: '/assets', label: 'Sachwerte', icon: Landmark },
   { href: '/transactions', label: 'Transaktionen', icon: ArrowLeftRight },
   { href: '/reports', label: 'Berichte', icon: BarChart3 },
   { href: '/import', label: 'Import', icon: Upload },

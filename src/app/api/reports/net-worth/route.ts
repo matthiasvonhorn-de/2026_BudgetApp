@@ -79,10 +79,29 @@ export const GET = withHandler(async (request: Request) => {
     0,
   )
 
+  // 4. Asset (Sachwerte) values: latest value per active asset × ownership
+  const assetValues = await prisma.asset.findMany({
+    where: { isActive: true },
+    select: {
+      ownershipPercent: true,
+      values: {
+        orderBy: { date: 'desc' },
+        take: 1,
+        select: { value: true },
+      },
+    },
+  })
+
+  const totalRealAssets = assetValues.reduce(
+    (sum, a) => sum + (a.values[0]?.value ?? 0) * (a.ownershipPercent / 100),
+    0,
+  )
+
   return NextResponse.json({
     totalAssets: roundCents(totalAssets),
     totalPortfolios: roundCents(totalPortfolios),
+    totalRealAssets: roundCents(totalRealAssets),
     totalDebts: roundCents(totalDebts),
-    netWorth: roundCents(totalAssets + totalPortfolios - totalDebts),
+    netWorth: roundCents(totalAssets + totalPortfolios + totalRealAssets - totalDebts),
   })
 })

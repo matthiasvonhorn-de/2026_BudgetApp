@@ -123,6 +123,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground mt-1">
               Konten {fmt(netWorth?.totalAssets ?? 0)}
               {(netWorth?.totalPortfolios ?? 0) > 0 && <> · Depots {fmt(netWorth?.totalPortfolios ?? 0)}</>}
+              {(netWorth?.totalRealAssets ?? 0) > 0 && <> · Sachwerte {fmt(netWorth?.totalRealAssets ?? 0)}</>}
               {(netWorth?.totalDebts ?? 0) > 0 && <> · Schulden −{fmt(netWorth?.totalDebts ?? 0)}</>}
             </p>
           </CardContent>
