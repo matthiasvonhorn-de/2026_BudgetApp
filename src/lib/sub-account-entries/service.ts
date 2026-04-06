@@ -7,7 +7,7 @@ type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 interface CreateLinkedEntryInput {
   groupId: string
-  categoryId: string
+  categoryId?: string
   date: string
   description: string
   amount: number
@@ -25,16 +25,18 @@ export async function createLinkedEntry(input: CreateLinkedEntryInput) {
     })
     if (!group) throw new DomainError('Gruppe nicht gefunden', 404)
 
-    // Validate category belongs to this group and is not TRANSFER
-    const category = await tx.category.findUnique({
-      where: { id: categoryId },
-      select: { subAccountGroupId: true, subAccountLinkType: true },
-    })
-    if (!category || category.subAccountGroupId !== groupId) {
-      throw new DomainError('Kategorie gehört nicht zu dieser Gruppe', 400)
-    }
-    if (category.subAccountLinkType === 'TRANSFER') {
-      throw new DomainError('TRANSFER-Einträge müssen über den Transaktions-Dialog erstellt werden', 400)
+    // Validate category belongs to this group and is not TRANSFER (if provided)
+    if (categoryId) {
+      const category = await tx.category.findUnique({
+        where: { id: categoryId },
+        select: { subAccountGroupId: true, subAccountLinkType: true },
+      })
+      if (!category || category.subAccountGroupId !== groupId) {
+        throw new DomainError('Kategorie gehört nicht zu dieser Gruppe', 400)
+      }
+      if (category.subAccountLinkType === 'TRANSFER') {
+        throw new DomainError('TRANSFER-Einträge müssen über den Transaktions-Dialog erstellt werden', 400)
+      }
     }
 
     const accountId = group.subAccount.accountId
@@ -64,7 +66,7 @@ export async function createLinkedEntry(input: CreateLinkedEntryInput) {
         subType,
         description,
         accountId,
-        categoryId,
+        categoryId: categoryId ?? null,
         status: 'PENDING',
         subAccountEntryId: entry.id,
       },

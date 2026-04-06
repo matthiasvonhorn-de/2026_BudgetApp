@@ -75,7 +75,7 @@ function InlineEdit({
 }
 
 // ---- New entry row ----
-function NewEntryRow({ groupId, accountId, categoryId, onDone }: { groupId: string; accountId: string; categoryId: string; onDone: () => void }) {
+function NewEntryRow({ groupId, accountId, categoryId, onDone }: { groupId: string; accountId: string; categoryId?: string; onDone: () => void }) {
   const qc = useQueryClient()
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
   const [description, setDescription] = useState('')
@@ -85,7 +85,7 @@ function NewEntryRow({ groupId, accountId, categoryId, onDone }: { groupId: stri
       fetch(`/api/sub-account-groups/${groupId}/entries`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, description, amount: parseFloat(amount), fromBudget: false, categoryId }),
+        body: JSON.stringify({ date, description, amount: parseFloat(amount), fromBudget: false, ...(categoryId ? { categoryId } : {}) }),
       }).then(r => r.json()),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['sub-accounts', accountId] })
@@ -280,9 +280,8 @@ function GroupSection({
       {/* Add entry row */}
       {expanded && (() => {
         const bookingCategory = group.linkedCategories?.find(c => c.subAccountLinkType === 'BOOKING')
-        if (!bookingCategory) return null
         return addingEntry
-          ? <NewEntryRow groupId={group.id} accountId={accountId} categoryId={bookingCategory.id} onDone={() => setAddingEntry(false)} />
+          ? <NewEntryRow groupId={group.id} accountId={accountId} categoryId={bookingCategory?.id} onDone={() => setAddingEntry(false)} />
           : (
             <tr>
               <td colSpan={5} className="px-2 py-1 pl-8">
