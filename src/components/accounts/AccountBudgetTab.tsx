@@ -354,16 +354,44 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
     onError: () => toast.error('Fehler beim Speichern'),
   })
 
-  const rolloverMutation = useMutation({
+  const rolloverCheck = useMutation({
     mutationFn: () =>
-      fetch(`/api/accounts/${accountId}/budget/${budgetYear}/${budgetMonth}/rollover`, { method: 'POST' }).then(r => r.json()),
+      fetch(`/api/accounts/${accountId}/budget/${budgetYear}/${budgetMonth}/rollover`).then(r => r.json()),
+  })
+
+  const rolloverMutation = useMutation({
+    mutationFn: (mode: 'create' | 'update') =>
+      fetch(`/api/accounts/${accountId}/budget/${budgetYear}/${budgetMonth}/rollover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      }).then(r => r.json()),
     onSuccess: (d) => {
-      toast.success(`Übertrag für ${d.entries} Kategorien in ${d.nextMonth}/${d.nextYear} gespeichert`)
+      const msg = d.cascadedMonths > 0
+        ? `Übertrag für ${d.entries} Kategorien aktualisiert (${d.cascadedMonths} Folgemonate)`
+        : `Übertrag für ${d.entries} Kategorien in ${d.nextMonth}/${d.nextYear} gespeichert`
+      toast.success(msg)
       qc.invalidateQueries({ queryKey: ['account-budget'] })
       qc.invalidateQueries({ queryKey: ['budget'] })
     },
     onError: () => toast.error('Fehler beim Übertrag'),
   })
+
+  const handleRollover = async () => {
+    try {
+      const check = await rolloverCheck.mutateAsync()
+      if (!check.hasExistingEntries) {
+        rolloverMutation.mutate('create')
+      } else {
+        const ok = confirm(
+          `Im Folgemonat (${check.nextMonth}/${check.nextYear}) existieren bereits ${check.existingCount} Budgetvorgaben.\n\nSollen die Überträge aktualisiert werden? Die monatlichen Budgets bleiben unverändert.`
+        )
+        if (ok) rolloverMutation.mutate('update')
+      }
+    } catch {
+      toast.error('Fehler beim Prüfen des Folgemonats')
+    }
+  }
 
   const startEdit = (categoryId: string, current: number) => {
     setEditingCell(categoryId)
@@ -431,8 +459,8 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => rolloverMutation.mutate()}
-            disabled={rolloverMutation.isPending}
+            onClick={handleRollover}
+            disabled={rolloverMutation.isPending || rolloverCheck.isPending}
           >
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
             Übertrag
