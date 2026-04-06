@@ -372,6 +372,52 @@ model PortfolioValue {
   @@index([portfolioId])
 }
 
+model AssetType {
+  id        String   @id @default(cuid())
+  name      String
+  icon      String   @default("Package")
+  color     String   @default("#6366f1")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assets Asset[]
+}
+
+model Asset {
+  id               String   @id @default(cuid())
+  name             String
+  assetTypeId      String
+  color            String   @default("#6366f1")
+  ownershipPercent Float    @default(100)
+  purchaseDate     DateTime
+  purchasePrice    Float
+  notes            String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  assetType AssetType    @relation(fields: [assetTypeId], references: [id])
+  values    AssetValue[]
+
+  @@index([assetTypeId])
+}
+
+model AssetValue {
+  id        String   @id @default(cuid())
+  assetId   String
+  date      DateTime
+  value     Float
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, date])
+  @@index([assetId])
+}
+
 model AppSetting {
   key       String   @id
   value     String
