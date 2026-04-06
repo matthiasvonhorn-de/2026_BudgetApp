@@ -252,6 +252,22 @@ export interface GroupSpendingData {
   income: GroupSpending[]
 }
 
+export interface AccountBalanceGroupSnapshot {
+  groupId: string
+  groupName: string
+  subAccountName: string
+  balance: number
+}
+
+export interface AccountBalanceMonth {
+  year: number
+  month: number
+  mainBalance: number
+  subBalance: number
+  totalBalance: number
+  groups: AccountBalanceGroupSnapshot[]
+}
+
 export interface NetWorth {
   totalAssets: number
   totalDebts: number

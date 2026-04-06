@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AppSelect } from '@/components/ui/app-select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useSettingsStore } from '@/store/useSettingsStore'
-import type { Account, MonthlySummary, GroupSpending, GroupSpendingData, BudgetData, BudgetGroup } from '@/types/api'
+import type { Account, AccountBalanceMonth, MonthlySummary, GroupSpending, GroupSpendingData, BudgetData, BudgetGroup } from '@/types/api'
 
 const BUDGET_ACCOUNT_TYPES = ['CHECKING', 'SAVINGS', 'CREDIT_CARD', 'CASH']
 
@@ -118,6 +118,32 @@ export default function ReportsPage() {
     queryFn: () => fetch(`/api/budget/${selectedYear}/${selectedMonth}`).then(r => r.json()),
   })
 
+  const { data: accountBalance = [] } = useQuery<AccountBalanceMonth[]>({
+    queryKey: ['reports-account-balance', selectedAccountId],
+    queryFn: () => fetch(`/api/reports/account-balance?accountId=${selectedAccountId}&months=12`).then(r => r.json()),
+    enabled: !!selectedAccountId,
+  })
+
+  const balanceChartData = accountBalance.map((d) => ({
+    name: `${MONTHS_DE[d.month - 1]} ${d.year !== now.getFullYear() ? d.year : ''}`.trim(),
+    Gesamt: d.totalBalance,
+    Hauptkonto: d.mainBalance,
+    Unterkonten: d.subBalance,
+  }))
+
+  // Unique sub-account groups with time series data
+  const groupIds = accountBalance.length > 0
+    ? [...new Map(accountBalance[0].groups.map(g => [g.groupId, g])).values()]
+    : []
+  const groupCharts = groupIds.map(g => ({
+    groupId: g.groupId,
+    title: `${g.subAccountName} — ${g.groupName}`,
+    data: accountBalance.map(m => ({
+      name: `${MONTHS_DE[m.month - 1]} ${m.year !== now.getFullYear() ? m.year : ''}`.trim(),
+      Saldo: m.groups.find(gg => gg.groupId === g.groupId)?.balance ?? 0,
+    })),
+  }))
+
   const chartData = monthlySummary.map((d: MonthlySummary) => ({
     name: `${MONTHS_DE[d.month - 1]} ${d.year !== now.getFullYear() ? d.year : ''}`.trim(),
     Einnahmen: d.income,
@@ -157,15 +183,113 @@ export default function ReportsPage() {
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Berichte</h1>
 
-      <Tabs defaultValue="monatsübersicht">
+      <Tabs defaultValue="gesamtübersicht">
         <TabsList className="mb-6">
-          <TabsTrigger value="monatsübersicht">Monatsübersicht</TabsTrigger>
+          <TabsTrigger value="gesamtübersicht">Gesamtübersicht</TabsTrigger>
+          <TabsTrigger value="monat">Monatsübersicht</TabsTrigger>
           <TabsTrigger value="kategorien">Gruppenanalyse</TabsTrigger>
           <TabsTrigger value="budget">Budget vs. Ist</TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Monatsübersicht */}
-        <TabsContent value="monatsübersicht" className="space-y-6">
+        {/* Tab 2: Monatsübersicht — Saldenbericht pro Konto */}
+        <TabsContent value="monat" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">Monatsübersicht</h2>
+            <AppSelect
+              value={selectedAccountId ?? ''}
+              onValueChange={setSelectedAccountId}
+              options={budgetAccounts.map(a => ({ value: a.id, label: a.name }))}
+              placeholder="Konto"
+              className="w-48"
+            />
+          </div>
+
+          {balanceChartData.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Keine Daten für dieses Konto
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Gesamtsaldo im Verlauf</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={balanceChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
+                      <Tooltip content={<CustomTooltipBar />} />
+                      <Legend />
+                      <Line type="monotone" dataKey="Gesamt" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Saldo Hauptkonto im Verlauf</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={balanceChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
+                      <Tooltip content={<CustomTooltipBar />} />
+                      <Legend />
+                      <Line type="monotone" dataKey="Hauptkonto" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Saldo Unterkonten im Verlauf</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={balanceChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
+                      <Tooltip content={<CustomTooltipBar />} />
+                      <Legend />
+                      <Line type="monotone" dataKey="Unterkonten" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {groupCharts.map((gc) => (
+                <Card key={gc.groupId}>
+                  <CardHeader>
+                    <CardTitle className="text-base">{gc.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={gc.data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis tickFormatter={fmtCompact} tick={{ fontSize: 11 }} />
+                        <Tooltip content={<CustomTooltipBar />} />
+                        <Line type="monotone" dataKey="Saldo" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          )}
+        </TabsContent>
+
+        {/* Tab 1: Gesamtübersicht */}
+        <TabsContent value="gesamtübersicht" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="pb-2">
