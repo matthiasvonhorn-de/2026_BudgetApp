@@ -12,7 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
-import type { Account, Transaction, BudgetData, MonthlySummary, CategorySpending, NetWorth } from '@/types/api'
+import type { Account, Transaction, BudgetData, MonthlySummary, GroupSpending, GroupSpendingData, NetWorth } from '@/types/api'
 
 const MONTHS_DE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
@@ -75,10 +75,11 @@ export default function DashboardPage() {
     queryFn: () => fetch('/api/reports/monthly-summary?months=6').then(r => r.json()),
   })
 
-  const { data: categorySpending = [] } = useQuery<CategorySpending[]>({
-    queryKey: ['reports-category-spending', budgetYear, budgetMonth],
+  const { data: groupSpendingData } = useQuery<GroupSpendingData>({
+    queryKey: ['reports-group-spending', budgetYear, budgetMonth],
     queryFn: () => fetch(`/api/reports/category-spending?year=${budgetYear}&month=${budgetMonth}`).then(r => r.json()),
   })
+  const groupSpending = groupSpendingData?.expenses ?? []
 
   const summary = budgetData?.summary
   const currentMonth = monthlySummary.find(m => m.year === budgetYear && m.month === budgetMonth)
@@ -89,7 +90,7 @@ export default function DashboardPage() {
     Ausgaben: d.expenses,
   }))
 
-  const topCategories = categorySpending.slice(0, 6)
+  const topGroups = groupSpending?.slice(0, 6) ?? []
 
   return (
     <div className="p-6">
@@ -192,16 +193,16 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {topCategories.length > 0 ? (
+          {topGroups.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Ausgaben nach Kategorie</CardTitle>
+                <CardTitle className="text-base">Ausgaben nach Gruppe</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
                     <Pie
-                      data={topCategories}
+                      data={topGroups}
                       dataKey="amount"
                       nameKey="name"
                       cx="50%"
@@ -210,8 +211,8 @@ export default function DashboardPage() {
                       innerRadius={35}
                       paddingAngle={2}
                     >
-                      {topCategories.map((entry) => (
-                        <Cell key={entry.categoryId} fill={entry.color} />
+                      {topGroups.map((entry) => (
+                        <Cell key={entry.groupId} fill={entry.color} />
                       ))}
                     </Pie>
                     <Tooltip content={<PieTooltip />} />

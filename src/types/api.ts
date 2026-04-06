@@ -240,11 +240,16 @@ export interface MonthlySummary {
   expenses: number
 }
 
-export interface CategorySpending {
-  categoryId: string
+export interface GroupSpending {
+  groupId: string
   name: string
   color: string
   amount: number
+}
+
+export interface GroupSpendingData {
+  expenses: GroupSpending[]
+  income: GroupSpending[]
 }
 
 export interface NetWorth {
