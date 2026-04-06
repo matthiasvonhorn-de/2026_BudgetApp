@@ -81,6 +81,7 @@ export default function DashboardPage() {
   })
 
   const summary = budgetData?.summary
+  const currentMonth = monthlySummary.find(m => m.year === budgetYear && m.month === budgetMonth)
 
   const chartData = monthlySummary.map(d => ({
     name: MONTHS_DE[d.month - 1],
@@ -135,7 +136,7 @@ export default function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-emerald-600">{fmt(summary.totalIncome)}</p>
+                <p className="text-2xl font-bold text-emerald-600">{fmt(currentMonth?.income ?? 0)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Diesen Monat</p>
               </CardContent>
             </Card>
@@ -147,7 +148,7 @@ export default function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-destructive">{fmt(summary.totalActivity)}</p>
+                <p className="text-2xl font-bold text-destructive">-{fmt(currentMonth?.expenses ?? 0)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Diesen Monat</p>
               </CardContent>
             </Card>
