@@ -131,11 +131,11 @@ export const POST = withHandler(async (request: Request) => {
     if (data.transferTargetAccountId && data.sourceType && data.transferTargetType) {
       const amount = roundCents(Math.abs(data.mainAmount ?? data.subAmount ?? 0))
 
-      // Source side
+      // Source side — always TRANSFER type
       const srcMain = data.sourceType === 'MAIN' ? -amount : null
-      const srcMainType = data.sourceType === 'MAIN' ? 'EXPENSE' as const : 'INCOME' as const
+      const srcMainType = 'TRANSFER' as const
       const srcSub = data.sourceType === 'SUB' ? -amount : null
-      const srcSubType = data.sourceType === 'SUB' ? 'EXPENSE' as const : null
+      const srcSubType = data.sourceType === 'SUB' ? 'TRANSFER' as const : null
 
       // Determine source categoryId
       let srcCategoryId = data.sourceCategoryId || data.categoryId || null
@@ -187,11 +187,11 @@ export const POST = withHandler(async (request: Request) => {
         })
       }
 
-      // Target side
+      // Target side — always TRANSFER type
       const tgtMain = data.transferTargetType === 'MAIN' ? amount : null
-      const tgtMainType = 'INCOME' as const
+      const tgtMainType = 'TRANSFER' as const
       const tgtSub = data.transferTargetType === 'SUB' ? amount : null
-      const tgtSubType = data.transferTargetType === 'SUB' ? 'INCOME' as const : null
+      const tgtSubType = data.transferTargetType === 'SUB' ? 'TRANSFER' as const : null
 
       // Determine target categoryId
       let tgtCategoryId = data.transferTargetCategoryId || null
