@@ -69,8 +69,13 @@ export default function LoansPage() {
                     <p className="text-xs text-muted-foreground">{TYPE_LABELS[loan.loanType]}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-destructive">{fmt(stats.remainingBalance)}</p>
-                    <p className="text-xs text-muted-foreground">Restschuld</p>
+                    <p className="text-lg font-bold text-destructive">{fmt(stats.currentBalance)}</p>
+                    <p className="text-xs text-muted-foreground">Restschuld aktuell</p>
+                    {stats.remainingBalance !== stats.currentBalance && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Laufzeitende: <span className="font-medium text-foreground">{fmt(stats.remainingBalance)}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
 

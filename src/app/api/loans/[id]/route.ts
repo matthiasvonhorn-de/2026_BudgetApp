@@ -49,6 +49,9 @@ export const GET = withHandler(async (_, ctx) => {
   const totalInterestPaid = paidRows.reduce((s, p) => s + p.scheduledInterest, 0)
   const totalPrincipalPaid = paidRows.reduce((s, p) => s + p.scheduledPrincipal + p.extraPayment, 0)
 
+  const lastPaid = paidRows.at(-1)
+  const currentBalance = lastPaid ? lastPaid.scheduledBalance : loan.principal
+
   return NextResponse.json({
     ...loan,
     paidUntil: loan.paidUntil ? loan.paidUntil.toISOString().slice(0, 10) : null,
@@ -56,6 +59,7 @@ export const GET = withHandler(async (_, ctx) => {
       totalInterestPaid: roundCents(totalInterestPaid),
       totalPrincipalPaid: roundCents(totalPrincipalPaid),
       remainingBalance: loan.payments.at(-1)?.scheduledBalance ?? 0,
+      currentBalance: roundCents(currentBalance),
       periodsPaid: paidRows.length,
       totalPeriods: loan.payments.length,
     },
