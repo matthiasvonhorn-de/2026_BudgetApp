@@ -128,6 +128,33 @@ Spec-driven development: before any implementation, first work out a specificati
 
 **Never finish a task without committing and pushing.** A fix that isn't pushed doesn't exist on GitHub.
 
+## Tests — MANDATORY
+
+```bash
+npm test             # Run all Vitest tests (unit + api)
+npm run test:unit    # Run unit tests only
+npm run test:api     # Run API integration tests only
+npm run test:e2e     # Run Playwright E2E tests
+npm run test:all     # Run Vitest + Playwright
+```
+
+**Every code change to `src/lib/` or `src/app/api/` MUST include corresponding tests:**
+- New pure functions → unit test in `tests/unit/`
+- New/changed API routes → API integration test in `tests/api/`
+- New features/pages → E2E test in `tests/[feature]/`
+
+**Test directory structure:**
+```
+tests/
+  unit/              # Pure function tests (no DB, no server)
+  api/               # API route handler tests (test DB)
+  [feature]/         # E2E tests (Playwright)
+```
+
+**Pre-commit hook** runs ESLint + related Vitest tests on staged `.ts/.tsx` files. If it fails, fix the issue before committing.
+
+**CI (GitHub Actions)** runs lint, unit tests, and E2E on every push. PRs require green CI.
+
 ## Critical gotchas
 
 - `prisma migrate dev` **does not work** with the libSQL adapter — use manual SQL + `prisma generate`.
