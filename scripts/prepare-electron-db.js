@@ -1,13 +1,13 @@
 /**
  * Generates electron/empty.db — an empty database with the full current schema.
  *
- * Reads DDL (CREATE TABLE / CREATE INDEX) from prisma/dev.db and applies it
- * to a fresh SQLite file.  Sets schema_version = 1 in AppSetting.
+ * Uses the sqlite3 CLI (not better-sqlite3) to avoid native module version
+ * conflicts between Node.js and Electron.
  *
  * Run as part of electron:build, AFTER `next build` + `copy-static.js`.
  */
 
-const Database = require('better-sqlite3')
+const { execSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
@@ -23,49 +23,49 @@ if (!fs.existsSync(devDbPath)) {
   process.exit(1)
 }
 
-// Remove old empty.db if present
-if (fs.existsSync(emptyDbPath)) {
-  fs.unlinkSync(emptyDbPath)
+// Remove old empty.db and sidecar files if present
+for (const f of [emptyDbPath, emptyDbPath + '-shm', emptyDbPath + '-wal']) {
+  if (fs.existsSync(f)) fs.unlinkSync(f)
 }
 
-// Open dev.db read-only
-const devDb = new Database(devDbPath, { readonly: true })
+// Extract CREATE TABLE statements (excluding _prisma_migrations and sqlite_ internals)
+const tableSql = execSync(
+  `sqlite3 "${devDbPath}" "SELECT sql || ';' FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_prisma_migrations' AND sql IS NOT NULL ORDER BY name;"`,
+  { encoding: 'utf-8' }
+)
 
-// Collect CREATE TABLE statements (skip internal Prisma/SQLite tables)
-const tables = devDb
-  .prepare(
-    "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_prisma_migrations' ORDER BY name"
-  )
-  .all()
+// Extract CREATE INDEX statements
+const indexSql = execSync(
+  `sqlite3 "${devDbPath}" "SELECT sql || ';' FROM sqlite_master WHERE type='index' AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name;"`,
+  { encoding: 'utf-8' }
+)
 
-// Collect CREATE INDEX statements
-const indexes = devDb
-  .prepare(
-    "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name"
-  )
-  .all()
+// Combine DDL + schema_version seed
+const fullSql = [
+  tableSql.trim(),
+  indexSql.trim(),
+  `INSERT INTO "AppSetting" ("key", "value", "updatedAt") VALUES ('schema_version', '${SCHEMA_VERSION}', datetime('now'));`,
+].filter(Boolean).join('\n')
 
-devDb.close()
+// Write to temp file, then create empty.db via sqlite3 CLI
+const tmpFile = path.join(root, 'electron', '_schema_tmp.sql')
+fs.writeFileSync(tmpFile, fullSql)
 
-// Create fresh empty.db (no WAL mode — let the app set it at runtime)
-const emptyDb = new Database(emptyDbPath)
+try {
+  execSync(`sqlite3 "${emptyDbPath}" < "${tmpFile}"`, { stdio: 'pipe' })
+} finally {
+  fs.unlinkSync(tmpFile)
+}
 
-emptyDb.transaction(() => {
-  for (const { sql } of tables) {
-    emptyDb.exec(sql)
-  }
-  for (const { sql } of indexes) {
-    emptyDb.exec(sql)
-  }
+// Count tables and indexes for output
+const tableCount = execSync(
+  `sqlite3 "${emptyDbPath}" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"`,
+  { encoding: 'utf-8' }
+).trim()
 
-  // Seed schema_version so the migrator knows what version this DB is
-  emptyDb
-    .prepare(
-      "INSERT INTO AppSetting (key, value, updatedAt) VALUES ('schema_version', ?, datetime('now'))"
-    )
-    .run(String(SCHEMA_VERSION))
-})()
+const indexCount = execSync(
+  `sqlite3 "${emptyDbPath}" "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%';"`,
+  { encoding: 'utf-8' }
+).trim()
 
-emptyDb.close()
-
-console.log(`✓ Created electron/empty.db (${tables.length} tables, ${indexes.length} indexes, schema_version=${SCHEMA_VERSION})`)
+console.log(`✓ Created electron/empty.db (${tableCount} tables, ${indexCount} indexes, schema_version=${SCHEMA_VERSION})`)
