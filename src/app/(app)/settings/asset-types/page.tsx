@@ -124,6 +124,7 @@ export default function AssetTypesSettingsPage() {
       )}
 
       <AssetTypeDialog
+        key={`${dialogOpen ? 'open' : 'closed'}-${editType?.id ?? 'new'}`}
         open={dialogOpen}
         onOpenChange={closeDialog}
         editType={editType}

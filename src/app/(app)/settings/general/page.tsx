@@ -189,6 +189,7 @@ export default function GeneralSettingsPage() {
       </Card>
 
       <AccountFormDialog
+        key={`${accountDialog.open ? 'open' : 'closed'}-${accountDialog.account?.id ?? 'new'}`}
         open={accountDialog.open}
         onOpenChange={(open) => setAccountDialog({ open })}
         account={accountDialog.account}

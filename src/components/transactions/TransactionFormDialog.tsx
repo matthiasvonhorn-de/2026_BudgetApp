@@ -102,6 +102,7 @@ export function TransactionFormDialog({ open, onOpenChange, defaultAccountId, hi
     },
   })
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- React Hook Form watch() is intentionally incompatible with React Compiler; the compiler skips this component which is acceptable
   const watchedAccountId = form.watch('accountId')
   const currentType = form.watch('mainType')
 

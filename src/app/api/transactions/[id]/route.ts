@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { TransactionStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { DomainError } from '@/lib/api/errors'
@@ -105,7 +106,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
         newCategoryId,
         existingSubAccountEntryId: existing.subAccountEntryId,
         existingTransferId: existing.transferToId,
-        existingStatus: existing.status as any,
+        existingStatus: existing.status as TransactionStatus,
         transactionId: id,
       })
 

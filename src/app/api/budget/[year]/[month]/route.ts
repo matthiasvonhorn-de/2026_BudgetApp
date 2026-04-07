@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { withHandler } from '@/lib/api/handler'
-import type { AccountType } from '@prisma/client'
 
 export const GET = withHandler(async (_, ctx) => {
   const { year: yearStr, month: monthStr } = await (ctx as { params: Promise<{ year: string; month: string }> }).params
@@ -29,8 +28,6 @@ export const GET = withHandler(async (_, ctx) => {
     where: { year, month },
   })
   const budgetMap = new Map(budgetEntries.map(e => [e.categoryId, e]))
-
-  const accountFilter = { isActive: true, type: { notIn: ['SPARPLAN', 'FESTGELD'] as AccountType[] } }
 
   // Alle Transaktionen dieses Monats aggregiert nach Kategorie
   // Transfers und dual-sided TX (main+sub gefüllt) ausschließen

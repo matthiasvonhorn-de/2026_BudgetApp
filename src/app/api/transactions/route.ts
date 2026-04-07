@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { TransactionStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { createTransactionSchema } from '@/lib/schemas/transactions'
@@ -99,21 +100,20 @@ export const POST = withHandler(async (request: Request) => {
       ? 'TRANSFER'
       : data.mainType
 
-    // Create source transaction
-    const { skipSubAccountEntry: _skip1, skipPairedTransfer: _skip2, ...txData } = data
+    // Create source transaction (omit service-layer flags from the DB create payload)
     const t = await tx.transaction.create({
       data: {
         date: new Date(data.date),
-        mainAmount: txData.mainAmount ?? null,
+        mainAmount: data.mainAmount ?? null,
         mainType: txMainType,
-        subAmount: txData.subAmount ?? null,
-        subType: txData.subType ?? null,
-        description: txData.description,
-        payee: txData.payee || null,
-        notes: txData.notes || null,
-        accountId: txData.accountId,
+        subAmount: data.subAmount ?? null,
+        subType: data.subType ?? null,
+        description: data.description,
+        payee: data.payee || null,
+        notes: data.notes || null,
+        accountId: data.accountId,
         categoryId: data.categoryId || null,
-        status: txData.status ?? 'PENDING',
+        status: data.status ?? 'PENDING',
       },
       include: { account: true, category: true },
     })
@@ -260,7 +260,7 @@ export const POST = withHandler(async (request: Request) => {
         transactionMainAmount: data.mainAmount,
         date: new Date(data.date),
         description: data.description,
-        status: (data.status ?? 'PENDING') as any,
+        status: (data.status ?? 'PENDING') as TransactionStatus,
         categoryId: data.categoryId || null,
         linkedGroupId: linkedGroup.id,
         linkType,

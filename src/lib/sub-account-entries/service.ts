@@ -269,7 +269,7 @@ interface UpdateEntryFromTransactionInput {
 }
 
 export async function updateEntryFromTransaction(tx: TxClient, input: UpdateEntryFromTransactionInput) {
-  const { newMainAmount, oldMainAmount, date, description, newCategoryId, existingSubAccountEntryId, existingTransferId, existingStatus, transactionId } = input
+  const { newMainAmount, date, description, newCategoryId, existingSubAccountEntryId, existingTransferId, existingStatus, transactionId } = input
 
   // Resolve new category's sub-account group
   let newSubGroupId: string | null = null

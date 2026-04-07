@@ -267,6 +267,7 @@ export default function SavingsDetailPage() {
       </div>
 
       <AccountFormDialog
+        key={`${editOpen ? 'open' : 'closed'}-${(account as Account)?.id ?? 'new'}`}
         open={editOpen}
         onOpenChange={setEditOpen}
         account={account as Account}

@@ -330,13 +330,6 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
 
-  const { data: subAccountsData } = useQuery<{
-    subAccounts: Array<{ id: string; name: string; color: string; accountId: string; balance: number }>
-  }>({
-    queryKey: ['sub-accounts-summary'],
-    queryFn: () => fetch('/api/sub-accounts').then(r => r.json()),
-  })
-
   const saveMutation = useMutation({
     mutationFn: async ({ categoryId, budgeted }: { categoryId: string; budgeted: number }) => {
       const res = await fetch(`/api/budget/${budgetYear}/${budgetMonth}`, {
@@ -421,9 +414,6 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
   const closingPlan = summary?.closingBalancePlan ?? opening
   const closingActual = summary?.closingBalanceActual ?? opening
   const dateStr = `01.${String(budgetMonth).padStart(2, '0')}.${budgetYear}`
-
-  // Sub-Accounts dieses Kontos
-  const subAccounts = (subAccountsData?.subAccounts ?? []).filter(sa => sa.accountId === accountId)
 
   const allCats = groups.flatMap(g => g.categories)
   const incomePlan = allCats.filter(c => c.type === 'INCOME').reduce((s, c) => s + c.budgeted, 0)

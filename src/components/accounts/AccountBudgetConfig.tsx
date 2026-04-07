@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Pencil, Trash2, Check, X, ChevronDown, ChevronRight, GripVertical, Link2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -447,14 +447,12 @@ function GroupRow({
   const [addingCat, setAddingCat] = useState(false)
   const [editingCat, setEditingCat] = useState<string | null>(null)
 
-  const activeCategories = group.categories.filter(c => c.isActive)
-  const [orderedCats, setOrderedCats] = useState(
-    [...activeCategories].sort((a, b) => a.sortOrder - b.sortOrder)
+  const baseSortedCats = useMemo(
+    () => [...group.categories.filter(c => c.isActive)].sort((a, b) => a.sortOrder - b.sortOrder),
+    [group.categories],
   )
-
-  useEffect(() => {
-    setOrderedCats([...group.categories.filter(c => c.isActive)].sort((a, b) => a.sortOrder - b.sortOrder))
-  }, [group.categories])
+  const [catDragOverride, setCatDragOverride] = useState<typeof baseSortedCats | null>(null)
+  const orderedCats = catDragOverride ?? baseSortedCats
 
   const catSensors = useSensors(
     useSensor(PointerSensor),
@@ -468,8 +466,14 @@ function GroupRow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(items),
       }).then(r => r.json()),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['category-groups', accountId] }),
-    onError: () => toast.error('Reihenfolge konnte nicht gespeichert werden'),
+    onSuccess: () => {
+      setCatDragOverride(null)
+      qc.invalidateQueries({ queryKey: ['category-groups', accountId] })
+    },
+    onError: () => {
+      setCatDragOverride(null)
+      toast.error('Reihenfolge konnte nicht gespeichert werden')
+    },
   })
 
   const handleCategoryDragEnd = (event: DragEndEvent) => {
@@ -478,7 +482,7 @@ function GroupRow({
     const oldIdx = orderedCats.findIndex(c => c.id === active.id)
     const newIdx = orderedCats.findIndex(c => c.id === over.id)
     const next = arrayMove(orderedCats, oldIdx, newIdx)
-    setOrderedCats(next)
+    setCatDragOverride(next)
     reorderCats.mutate(next.map((c, i) => ({ id: c.id, sortOrder: i })))
   }
 
@@ -611,7 +615,6 @@ export function CategoryGroupManagerContent({
 }) {
   const qc = useQueryClient()
   const [addingGroup, setAddingGroup] = useState(false)
-  const [orderedGroups, setOrderedGroups] = useState<Group[]>([])
 
   const { data: groupsData } = useQuery<Group[]>({
     queryKey: ['category-groups', accountId],
@@ -619,11 +622,12 @@ export function CategoryGroupManagerContent({
     enabled,
   })
 
-  useEffect(() => {
-    if (groupsData) {
-      setOrderedGroups([...groupsData].sort((a, b) => a.sortOrder - b.sortOrder))
-    }
-  }, [groupsData])
+  const baseSortedGroups = useMemo(
+    () => groupsData ? [...groupsData].sort((a, b) => a.sortOrder - b.sortOrder) : [],
+    [groupsData],
+  )
+  const [groupDragOverride, setGroupDragOverride] = useState<Group[] | null>(null)
+  const orderedGroups = groupDragOverride ?? baseSortedGroups
 
   const groupSensors = useSensors(
     useSensor(PointerSensor),
@@ -637,8 +641,14 @@ export function CategoryGroupManagerContent({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(items),
       }).then(r => r.json()),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['category-groups', accountId] }),
-    onError: () => toast.error('Reihenfolge konnte nicht gespeichert werden'),
+    onSuccess: () => {
+      setGroupDragOverride(null)
+      qc.invalidateQueries({ queryKey: ['category-groups', accountId] })
+    },
+    onError: () => {
+      setGroupDragOverride(null)
+      toast.error('Reihenfolge konnte nicht gespeichert werden')
+    },
   })
 
   const handleGroupDragEnd = (event: DragEndEvent) => {
@@ -647,7 +657,7 @@ export function CategoryGroupManagerContent({
     const oldIdx = orderedGroups.findIndex(g => g.id === active.id)
     const newIdx = orderedGroups.findIndex(g => g.id === over.id)
     const next = arrayMove(orderedGroups, oldIdx, newIdx)
-    setOrderedGroups(next)
+    setGroupDragOverride(next)
     reorderGroups.mutate(next.map((g, i) => ({ id: g.id, sortOrder: i })))
   }
 

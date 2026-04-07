@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -87,14 +87,13 @@ interface Props {
 export function AccountFormDialog({ open, onOpenChange, account }: Props) {
   const qc = useQueryClient()
   const isEdit = !!account
-  const [form, setForm] = useState<FormState>(EMPTY)
-  const set = (k: keyof FormState, v: string) => setForm(f => ({ ...f, [k]: v }))
-
-  const isSavings = isSavingsType(form.type)
-  const isSparplan = form.type === 'SPARPLAN'
+  // User-edited overrides on top of the server-derived template
+  const [userEdits, setUserEdits] = useState<Partial<FormState>>({})
+  const set = (k: keyof FormState, v: string) => setUserEdits(f => ({ ...f, [k]: v }))
 
   // Date input refs (Safari-safe)
-  const startDateInitRef = useRef('')
+  // startDateInitRef is updated synchronously in render based on the derived form template
+  const startDateInitRef = useRef(account && !isSavingsType(account.type) ? '' : EMPTY.startDate)
   const startDateNodeRef = useRef<HTMLInputElement | null>(null)
   const startDateCallbackRef = useCallback((node: HTMLInputElement | null) => {
     startDateNodeRef.current = node
@@ -134,65 +133,58 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
 
   const giroAccounts = allAccounts.filter(a => !isSavingsType(a.type) && a.isActive)
 
+  // Derive form template from server data (no setState in effect — purely computed)
+  const serverTemplate = useMemo<FormState>(() => {
+    if (!isEdit || !account) return EMPTY
+    if (isSavingsType(account.type)) {
+      if (savingsConfig && !savingsConfig.error) {
+        return {
+          ...EMPTY,
+          type: account.type,
+          name: savingsConfig.account?.name ?? account.name,
+          iban: savingsConfig.accountNumber ?? '',
+          color: savingsConfig.account?.color ?? account.color,
+          interestRate: (savingsConfig.interestRate * 100).toFixed(2),
+          interestFrequency: savingsConfig.interestFrequency ?? 'MONTHLY',
+          upfrontFee: (savingsConfig.upfrontFee ?? 0).toString(),
+          contributionAmount: (savingsConfig.contributionAmount ?? 0).toString(),
+          contributionFrequency: savingsConfig.contributionFrequency ?? 'MONTHLY',
+          linkedAccountId: savingsConfig.linkedAccountId ?? '',
+          categoryId: savingsConfig.categoryId ?? '',
+          notes: savingsConfig.notes ?? '',
+          initializedUntil: '',
+        }
+      }
+      // Savings config not yet loaded — return partial template
+      return { ...EMPTY, type: account.type, name: account.name, color: account.color }
+    }
+    // Non-savings edit
+    return {
+      ...EMPTY,
+      type: account.type,
+      name: account.name,
+      bank: account.bank ?? '',
+      iban: account.iban ?? '',
+      color: account.color,
+      currentBalance: Math.round((account.currentBalance ?? 0) * 100 / 100).toString(),
+    }
+  }, [isEdit, account, savingsConfig])
+
+  // Merge server template with user edits — user edits take precedence
+  const form = useMemo<FormState>(() => ({ ...serverTemplate, ...userEdits }), [serverTemplate, userEdits])
+
+  // Keep date init refs in sync with form template (updated during render — safe for refs)
+  startDateInitRef.current = form.startDate
+
+  const isSavings = isSavingsType(form.type)
+  const isSparplan = form.type === 'SPARPLAN'
+
   // Load categories for linked account
   const { data: categoryGroups = [] } = useQuery<{ id: string; name: string; categories: { id: string; name: string }[] }[]>({
     queryKey: ['account-category-groups', form.linkedAccountId],
     queryFn: () => fetch(`/api/accounts/${form.linkedAccountId}/category-groups`).then(r => r.json()),
     enabled: open && !!form.linkedAccountId,
   })
-
-  // Populate form on open
-  useEffect(() => {
-    if (!open) return
-
-    if (!isEdit) {
-      setForm(EMPTY)
-      startDateInitRef.current = EMPTY.startDate
-      initUntilInitRef.current = ''
-      if (startDateNodeRef.current) startDateNodeRef.current.value = EMPTY.startDate
-      if (initUntilNodeRef.current) initUntilNodeRef.current.value = ''
-      return
-    }
-
-    // Edit mode — regular account
-    if (!isSavingsType(account.type)) {
-      setForm({
-        ...EMPTY,
-        type: account.type,
-        name: account.name,
-        bank: account.bank ?? '',
-        iban: account.iban ?? '',
-        color: account.color,
-        currentBalance: Math.round((account.currentBalance ?? 0) * 100 / 100).toString(),
-      })
-      return
-    }
-
-    // Edit mode — savings: wait for savingsConfig to load (handled in next effect)
-  }, [open, isEdit, account])
-
-  // Populate savings fields when savingsConfig loads
-  useEffect(() => {
-    if (!open || !isEdit || !savingsConfig || savingsConfig.error) return
-    if (!isSavingsType(account?.type)) return
-
-    setForm({
-      ...EMPTY,
-      type: account!.type,
-      name: savingsConfig.account?.name ?? account!.name,
-      iban: savingsConfig.accountNumber ?? '',
-      color: savingsConfig.account?.color ?? account!.color,
-      interestRate: (savingsConfig.interestRate * 100).toFixed(2),
-      interestFrequency: savingsConfig.interestFrequency ?? 'MONTHLY',
-      upfrontFee: (savingsConfig.upfrontFee ?? 0).toString(),
-      contributionAmount: (savingsConfig.contributionAmount ?? 0).toString(),
-      contributionFrequency: savingsConfig.contributionFrequency ?? 'MONTHLY',
-      linkedAccountId: savingsConfig.linkedAccountId ?? '',
-      categoryId: savingsConfig.categoryId ?? '',
-      notes: savingsConfig.notes ?? '',
-      initializedUntil: '',
-    })
-  }, [open, isEdit, savingsConfig, account])
 
   // Mutation
   const mutation = useMutation({

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Trash2, ArrowLeft, Pencil } from 'lucide-react'
@@ -55,12 +55,34 @@ function LoanDialog({
   const qc = useQueryClient()
   const { currency } = useSettingsStore()
   const fmt = useFormatCurrency()
-  const [form, setForm] = useState<LoanForm>(EMPTY)
+  const [form, setForm] = useState<LoanForm>(() => {
+    if (loan) {
+      const paidUntilValue = loan.paidUntil
+        ? new Date(loan.paidUntil).toISOString().slice(0, 10)
+        : ''
+      return {
+        name: loan.name,
+        loanType: loan.loanType as 'ANNUITAETENDARLEHEN' | 'RATENKREDIT',
+        principal: loan.principal.toString(),
+        interestRate: (loan.interestRate * 100).toFixed(3),
+        initialRepaymentRate: loan.initialRepaymentRate != null ? (loan.initialRepaymentRate * 100).toFixed(3) : '',
+        termMonths: loan.termMonths.toString(),
+        startDate: new Date(loan.startDate).toISOString().slice(0, 10),
+        paidUntil: paidUntilValue,
+        accountId: loan.accountId ?? '',
+        categoryId: loan.categoryId ?? '',
+        notes: loan.notes ?? '',
+      }
+    }
+    return EMPTY
+  })
   // paidUntilDraft is the source of truth for paidUntil — updated via native
   // DOM events so Safari's date picker is captured regardless of React's
   // synthetic event layer or Base UI portal timing.
-  const [paidUntilDraft, setPaidUntilDraft] = useState('')
-  const paidUntilInitValRef = useRef('')  // holds the init value for deferred portal mount
+  const [paidUntilDraft, setPaidUntilDraft] = useState(() => {
+    return loan?.paidUntil ? new Date(loan.paidUntil).toISOString().slice(0, 10) : ''
+  })
+  const paidUntilInitValRef = useRef(loan?.paidUntil ? new Date(loan.paidUntil).toISOString().slice(0, 10) : '')  // holds the init value for deferred portal mount
   const paidUntilNodeRef = useRef<HTMLInputElement | null>(null)
 
   // Callback ref: fires when the input element mounts (handles Base UI portal
@@ -78,37 +100,6 @@ function LoanDialog({
     node.addEventListener('input', handler)
     node.addEventListener('blur', handler)
   }, [])
-
-  useEffect(() => {
-    if (open) {
-      const paidUntilValue = loan?.paidUntil
-        ? new Date(loan.paidUntil).toISOString().slice(0, 10)
-        : ''
-      if (loan) {
-        setForm({
-          name: loan.name,
-          loanType: loan.loanType as 'ANNUITAETENDARLEHEN' | 'RATENKREDIT',
-          principal: loan.principal.toString(),
-          interestRate: (loan.interestRate * 100).toFixed(3),
-          initialRepaymentRate: loan.initialRepaymentRate != null ? (loan.initialRepaymentRate * 100).toFixed(3) : '',
-          termMonths: loan.termMonths.toString(),
-          startDate: new Date(loan.startDate).toISOString().slice(0, 10),
-          paidUntil: paidUntilValue,
-          accountId: loan.accountId ?? '',
-          categoryId: loan.categoryId ?? '',
-          notes: loan.notes ?? '',
-        })
-      } else {
-        setForm(EMPTY)
-      }
-      paidUntilInitValRef.current = paidUntilValue
-      setPaidUntilDraft(paidUntilValue)
-      // Update the DOM node directly if already mounted (re-open scenario)
-      if (paidUntilNodeRef.current) {
-        paidUntilNodeRef.current.value = paidUntilValue
-      }
-    }
-  }, [open, loan])
 
   const { data: accounts = [] } = useQuery({
     queryKey: ['accounts'],
@@ -206,7 +197,6 @@ function LoanDialog({
               <Select
                 value={form.loanType}
                 onValueChange={(v: string | null) => v && set('loanType', v as LoanForm['loanType'])}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 itemToStringLabel={(v: string) => ({ ANNUITAETENDARLEHEN: 'Annuitätendarlehen (konstante Rate)', RATENKREDIT: 'Ratenkredit (konstante Tilgung)' }[v as string] ?? v as string)}
               >
                 <SelectTrigger>
@@ -473,7 +463,7 @@ export default function LoansSettingsPage() {
         </div>
       )}
 
-      <LoanDialog open={dialogOpen} onClose={closeDialog} loan={editLoan} />
+      <LoanDialog key={`${dialogOpen ? 'open' : 'closed'}-${editLoan?.id ?? 'new'}`} open={dialogOpen} onClose={closeDialog} loan={editLoan} />
     </div>
   )
 }

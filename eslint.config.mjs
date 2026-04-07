@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // CommonJS files (Electron, build scripts) — not covered by TS rules
+    "electron/**",
+    "scripts/**",
+    "dist/**",
   ]),
 ]);
 

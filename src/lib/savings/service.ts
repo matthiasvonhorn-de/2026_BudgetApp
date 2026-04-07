@@ -249,12 +249,6 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
     const newFee = data.upfrontFee ?? config.upfrontFee
     const newContribution = data.contributionAmount ?? config.contributionAmount
 
-    // Find the last interest entry that was actually booked (has a real transaction).
-    // Initialized entries (paidAt set but no transactionId) can be safely rebuilt.
-    const lastBookedInterest = config.entries
-      .filter(e => e.entryType === 'INTEREST' && e.paidAt !== null && e.transactionId !== null)
-      .sort((a, b) => b.periodNumber - a.periodNumber)[0]
-
     // Delete all interest entries that can be rebuilt:
     // - unpaid entries (paidAt === null)
     // - initialized entries (paidAt set but no transactionId)

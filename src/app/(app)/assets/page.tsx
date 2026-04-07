@@ -231,7 +231,7 @@ export default function AssetsPage() {
         </>
       )}
 
-      <AssetDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <AssetDialog key={`asset-new-${dialogOpen ? 'open' : 'closed'}`} open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   )
 }
