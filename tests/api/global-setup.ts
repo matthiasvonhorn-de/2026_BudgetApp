@@ -7,52 +7,43 @@ export default function globalSetup() {
   const devDbPath = path.join(root, 'prisma', 'dev.db')
   const testDbPath = path.join(root, 'prisma', 'test.db')
 
-  // Remove old test DB + WAL/SHM files
-  for (const f of [testDbPath, testDbPath + '-shm', testDbPath + '-wal']) {
-    if (fs.existsSync(f)) fs.unlinkSync(f)
+  // If test.db already exists (e.g. created by CI workflow step), use it as-is
+  if (fs.existsSync(testDbPath)) {
+    const count = execSync(
+      `sqlite3 "${testDbPath}" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"`,
+      { encoding: 'utf-8' }
+    ).trim()
+    console.log(`[test-setup] Using existing prisma/test.db (${count} tables)`)
+    return
   }
 
-  // In CI: test.db may already be created by the workflow step.
-  // Locally: create from dev.db schema.
-  if (!fs.existsSync(testDbPath)) {
-    if (!fs.existsSync(devDbPath)) {
-      console.warn('[test-setup] Neither test.db nor dev.db found — skipping API test DB setup')
-      return
-    }
-    const tableSql = execSync(
-      `sqlite3 "${devDbPath}" "SELECT sql || ';' FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_prisma_migrations' AND sql IS NOT NULL ORDER BY name;"`,
-      { encoding: 'utf-8' }
-    )
-    const indexSql = execSync(
-      `sqlite3 "${devDbPath}" "SELECT sql || ';' FROM sqlite_master WHERE type='index' AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name;"`,
-      { encoding: 'utf-8' }
-    )
-    const fullSql = [tableSql.trim(), indexSql.trim()].filter(Boolean).join('\n')
-    const tmpFile = path.join(root, 'prisma', '_test_schema_tmp.sql')
-    fs.writeFileSync(tmpFile, fullSql)
-    try {
-      execSync(`sqlite3 "${testDbPath}" < "${tmpFile}"`, { stdio: 'pipe' })
-    } finally {
-      fs.unlinkSync(tmpFile)
-    }
+  // Local development: create test.db from dev.db schema
+  if (!fs.existsSync(devDbPath)) {
+    console.warn('[test-setup] Neither test.db nor dev.db found — skipping API test DB setup')
+    return
   }
 
-  // Verify tables were created
+  const tableSql = execSync(
+    `sqlite3 "${devDbPath}" "SELECT sql || ';' FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_prisma_migrations' AND sql IS NOT NULL ORDER BY name;"`,
+    { encoding: 'utf-8' }
+  )
+  const indexSql = execSync(
+    `sqlite3 "${devDbPath}" "SELECT sql || ';' FROM sqlite_master WHERE type='index' AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name;"`,
+    { encoding: 'utf-8' }
+  )
+  const fullSql = [tableSql.trim(), indexSql.trim()].filter(Boolean).join('\n')
+  const tmpFile = path.join(root, 'prisma', '_test_schema_tmp.sql')
+  fs.writeFileSync(tmpFile, fullSql)
+  try {
+    execSync(`sqlite3 "${testDbPath}" < "${tmpFile}"`, { stdio: 'pipe' })
+  } finally {
+    fs.unlinkSync(tmpFile)
+  }
+
   const count = execSync(
     `sqlite3 "${testDbPath}" "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';"`,
     { encoding: 'utf-8' }
   ).trim()
 
   console.log(`[test-setup] Created prisma/test.db (${count} tables)`)
-}
-
-export function teardown() {
-  const root = path.resolve(__dirname, '../..')
-  const testDbPath = path.join(root, 'prisma', 'test.db')
-
-  for (const f of [testDbPath, testDbPath + '-shm', testDbPath + '-wal']) {
-    if (fs.existsSync(f)) fs.unlinkSync(f)
-  }
-
-  console.log('[test-teardown] Removed prisma/test.db')
 }
