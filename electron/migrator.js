@@ -29,7 +29,7 @@ function migrate(userDbPath, bundledDbPath, migrationsDir) {
 
   try {
     const changes = detectChanges(userDb, bundledDb)
-    const manualMigrations = detectManualMigrations(userDb, bundledDb, migrationsDir)
+    const manualMigrations = detectManualMigrations(userDb, migrationsDir)
 
     if (changes.length === 0 && manualMigrations.length === 0) {
       return result
@@ -136,7 +136,7 @@ function detectChanges(userDb, bundledDb) {
   for (const { name, sql } of bundledIndexes) {
     if (!userIndexNames.has(name)) {
       // Use IF NOT EXISTS for safety
-      const safeSql = sql.replace('CREATE INDEX', 'CREATE INDEX IF NOT EXISTS')
+      const safeSql = sql.replace(/^CREATE\s+(UNIQUE\s+)?INDEX\b/, 'CREATE $1INDEX IF NOT EXISTS')
       changes.push({
         description: `Create index: ${name}`,
         sql: safeSql,
@@ -152,7 +152,7 @@ function detectChanges(userDb, bundledDb) {
  */
 function buildDefaultClause(col) {
   if (col.dflt_value !== null) {
-    return ` DEFAULT ${col.dflt_value}`
+    return `${col.notnull ? ' NOT NULL' : ''} DEFAULT ${col.dflt_value}`
   }
   if (col.notnull) {
     // NOT NULL columns need a default for ALTER TABLE ADD COLUMN
@@ -174,7 +174,7 @@ function buildDefaultClause(col) {
 /**
  * Find manual migration files that haven't been applied yet.
  */
-function detectManualMigrations(userDb, bundledDb, migrationsDir) {
+function detectManualMigrations(userDb, migrationsDir) {
   if (!fs.existsSync(migrationsDir)) return []
 
   const currentVersion = getSchemaVersion(userDb)
