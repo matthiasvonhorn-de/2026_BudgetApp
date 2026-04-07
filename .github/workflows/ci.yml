@@ -21,7 +21,7 @@ jobs:
       - run: npm run lint
       - run: npm run test:unit
       - name: Create test database for API tests
-        run: npx prisma db push --accept-data-loss --url "file:./prisma/test.db"
+        run: sqlite3 prisma/test.db < prisma/schema.sql
       - run: npm run test:api
 
   # E2E tests require a running app + database — will be configured later
