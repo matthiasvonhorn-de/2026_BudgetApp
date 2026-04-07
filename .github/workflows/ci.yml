@@ -23,25 +23,19 @@ jobs:
         continue-on-error: true
       - run: npm run test:unit
 
-  e2e:
-    name: E2E Tests
-    needs: [lint-and-unit]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npx prisma generate
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
-        env:
-          DATABASE_URL: file:./prisma/dev.db
-      - name: Create test database
-        run: |
-          sqlite3 prisma/dev.db "SELECT 1;" 2>/dev/null || touch prisma/dev.db
-      - run: npm run test:e2e
-        env:
-          DATABASE_URL: file:./prisma/dev.db
+  # E2E tests require a running app + database — will be configured in test strategy Part 2
+  # e2e:
+  #   name: E2E Tests
+  #   needs: [lint-and-unit]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 22
+  #         cache: npm
+  #     - run: npm ci
+  #     - run: npx prisma generate
+  #     - run: npx playwright install --with-deps chromium
+  #     - run: npm run build
+  #     - run: npm run test:e2e
