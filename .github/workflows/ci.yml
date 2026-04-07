@@ -20,8 +20,11 @@ jobs:
       - run: npx prisma generate
       - run: npm run lint
       - run: npm run test:unit
+      - name: Create test database for API tests
+        run: sqlite3 prisma/test.db < prisma/schema.sql
+      - run: npm run test:api
 
-  # E2E tests require a running app + database — will be configured in test strategy Part 2
+  # E2E tests require a running app + database — will be configured later
   # e2e:
   #   name: E2E Tests
   #   needs: [lint-and-unit]
