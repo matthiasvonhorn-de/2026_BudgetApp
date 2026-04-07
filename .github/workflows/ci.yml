@@ -18,9 +18,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma generate
-      - name: Lint (non-blocking — pre-existing issues)
-        run: npm run lint
-        continue-on-error: true
+      - run: npm run lint
       - run: npm run test:unit
 
   # E2E tests require a running app + database — will be configured in test strategy Part 2
