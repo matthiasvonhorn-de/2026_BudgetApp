@@ -11,8 +11,8 @@
     "prod:start": "DATABASE_URL=file:$PWD/prisma/prod.db PORT=3001 node .next/standalone/server.js",
     "lint": "eslint",
     "electron:dev": "electron .",
-    "electron:build": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac zip",
-    "electron:build:dir": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
+    "electron:build": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && node scripts/prepare-electron-db.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac zip && node scripts/create-dist-zip.js",
+    "electron:build:dir": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && node scripts/prepare-electron-db.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
@@ -24,17 +24,20 @@
       "output": "dist"
     },
     "files": [
-      "electron/main.js"
+      "electron/main.js",
+      "electron/migrator.js",
+      "electron/migrations/**/*"
     ],
     "extraResources": [
       {
-        "from": "prisma/dev.db",
+        "from": "electron/empty.db",
         "to": "db/budget.db"
       }
     ],
     "afterPack": "scripts/after-pack.js",
     "mac": {
       "category": "public.app-category.finance",
+      "icon": "electron/icon.png",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "identity": null,
@@ -89,6 +92,7 @@
     "react-hook-form": "^7.71.2",
     "recharts": "^3.8.0",
     "shadcn": "^4.0.6",
+    "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4",

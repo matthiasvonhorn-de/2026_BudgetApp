@@ -1,0 +1,36 @@
+BudgetApp — Anleitung
+=====================
+
+ERSTER START
+------------
+1. Doppelklicke auf "BudgetApp installieren.command"
+2. macOS fragt "Möchtest du es wirklich öffnen?" → Klicke "Öffnen"
+3. Das Skript startet die App automatisch
+
+Danach kannst du BudgetApp.app ganz normal per Doppelklick öffnen.
+
+
+UPDATES
+-------
+Wenn du eine neue Version bekommst:
+1. Lösche die alte BudgetApp.app (oder ersetze sie)
+2. Entpacke die neue ZIP-Datei
+3. Führe "BudgetApp installieren.command" erneut aus
+
+Deine Daten bleiben erhalten — sie werden getrennt von der App gespeichert.
+
+
+OPTIONAL: APP IN PROGRAMME VERSCHIEBEN
+--------------------------------------
+Du kannst BudgetApp.app in den Ordner "Programme" ziehen.
+Danach "BudgetApp installieren.command" nochmal ausführen,
+oder im Terminal eingeben:
+    xattr -cr /Applications/BudgetApp.app
+
+
+BEI PROBLEMEN
+-------------
+Falls die App nicht startet:
+1. Öffne das Terminal (Programme → Dienstprogramme → Terminal)
+2. Gib ein:  xattr -cr /Pfad/zu/BudgetApp.app
+3. Starte die App erneut
