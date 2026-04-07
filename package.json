@@ -11,8 +11,8 @@
     "prod:start": "DATABASE_URL=file:$PWD/prisma/prod.db PORT=3001 node .next/standalone/server.js",
     "lint": "eslint",
     "electron:dev": "electron .",
-    "electron:build": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && npm rebuild better-sqlite3 && node scripts/prepare-electron-db.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac zip",
-    "electron:build:dir": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && npm rebuild better-sqlite3 && node scripts/prepare-electron-db.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
+    "electron:build": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && node scripts/prepare-electron-db.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac zip",
+    "electron:build:dir": "node node_modules/next/dist/bin/next build && node scripts/copy-static.js && node scripts/prepare-electron-db.js && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },
@@ -27,9 +27,6 @@
       "electron/main.js",
       "electron/migrator.js",
       "electron/migrations/**/*"
-    ],
-    "asarUnpack": [
-      "node_modules/better-sqlite3/**/*"
     ],
     "extraResources": [
       {
@@ -104,8 +101,5 @@
     "typescript": "^5",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
-  },
-  "dependencies": {
-    "better-sqlite3": "^12.8.0"
   }
 }
