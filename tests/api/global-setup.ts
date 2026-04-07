@@ -12,8 +12,13 @@ export default function globalSetup() {
     if (fs.existsSync(f)) fs.unlinkSync(f)
   }
 
-  if (fs.existsSync(devDbPath)) {
-    // Local development: extract schema from dev.db via sqlite3 CLI
+  // In CI: test.db may already be created by the workflow step.
+  // Locally: create from dev.db schema.
+  if (!fs.existsSync(testDbPath)) {
+    if (!fs.existsSync(devDbPath)) {
+      console.warn('[test-setup] Neither test.db nor dev.db found — skipping API test DB setup')
+      return
+    }
     const tableSql = execSync(
       `sqlite3 "${devDbPath}" "SELECT sql || ';' FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_prisma_migrations' AND sql IS NOT NULL ORDER BY name;"`,
       { encoding: 'utf-8' }
@@ -30,14 +35,6 @@ export default function globalSetup() {
     } finally {
       fs.unlinkSync(tmpFile)
     }
-  } else {
-    // CI environment: use prisma db push to create test.db directly from schema
-    console.log('[test-setup] prisma/dev.db not found — using prisma db push for test.db...')
-    execSync('npx prisma db push --skip-generate --accept-data-loss', {
-      cwd: root,
-      env: { ...process.env, DATABASE_URL: `file:${testDbPath}` },
-      stdio: 'pipe',
-    })
   }
 
   // Verify tables were created

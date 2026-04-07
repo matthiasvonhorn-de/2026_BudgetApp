@@ -20,6 +20,10 @@ jobs:
       - run: npx prisma generate
       - run: npm run lint
       - run: npm run test:unit
+      - name: Create test database for API tests
+        run: npx prisma db push --accept-data-loss
+        env:
+          DATABASE_URL: file:./prisma/test.db
       - run: npm run test:api
 
   # E2E tests require a running app + database — will be configured later
