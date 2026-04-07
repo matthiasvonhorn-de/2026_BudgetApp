@@ -143,11 +143,15 @@ export async function seedDatabase() {
     },
   })
 
-  // --- App Settings ---
-  await prisma.appSetting.createMany({
-    data: [
-      { key: 'currency', value: 'EUR' },
-      { key: 'locale', value: 'de-DE' },
-    ],
-  })
+  // --- App Settings (upsert to avoid unique constraint issues) ---
+  for (const { key, value } of [
+    { key: 'currency', value: 'EUR' },
+    { key: 'locale', value: 'de-DE' },
+  ]) {
+    await prisma.appSetting.upsert({
+      where: { key },
+      update: { value },
+      create: { key, value },
+    })
+  }
 }

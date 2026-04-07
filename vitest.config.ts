@@ -9,6 +9,7 @@ export default defineConfig({
   },
   test: {
     include: ['tests/unit/**/*.test.ts', 'tests/api/**/*.test.ts'],
+    fileParallelism: false, // API tests share a SQLite DB — must run sequentially
     env: {
       DATABASE_URL: `file:${path.resolve(__dirname, 'prisma/test.db')}`,
     },
