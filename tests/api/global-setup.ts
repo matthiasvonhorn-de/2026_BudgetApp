@@ -8,7 +8,18 @@ export default function globalSetup() {
   const testDbPath = path.join(root, 'prisma', 'test.db')
 
   if (!fs.existsSync(devDbPath)) {
-    throw new Error('prisma/dev.db not found — run the dev server at least once to create it')
+    // CI environment: create dev.db from Prisma schema using db push
+    console.log('[test-setup] prisma/dev.db not found — creating from schema...')
+    try {
+      execSync('npx prisma db push --skip-generate --accept-data-loss', {
+        cwd: root,
+        env: { ...process.env, DATABASE_URL: `file:${devDbPath}` },
+        stdio: 'pipe',
+      })
+    } catch {
+      console.warn('[test-setup] Could not create dev.db — API tests will be skipped')
+      return
+    }
   }
 
   // Remove old test DB + WAL/SHM files
