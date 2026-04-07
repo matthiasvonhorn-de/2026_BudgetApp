@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -41,30 +41,23 @@ const EMPTY: FormState = {
 export function AssetDialog({ open, onOpenChange, editAsset }: Props) {
   const qc = useQueryClient()
   const isEdit = !!editAsset
-  const [form, setForm] = useState<FormState>(EMPTY)
+  const [form, setForm] = useState<FormState>(() =>
+    editAsset ? {
+      name: editAsset.name,
+      assetTypeId: editAsset.assetTypeId,
+      color: editAsset.color,
+      ownershipPercent: editAsset.ownershipPercent.toString(),
+      purchaseDate: editAsset.purchaseDate.slice(0, 10),
+      purchasePrice: editAsset.purchasePrice.toString(),
+      notes: editAsset.notes ?? '',
+    } : EMPTY
+  )
   const set = (k: keyof FormState, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   const { data: assetTypes = [] } = useQuery<AssetType[]>({
     queryKey: ['asset-types'],
     queryFn: () => fetch('/api/asset-types').then(r => r.json()),
   })
-
-  useEffect(() => {
-    if (!open) return
-    if (editAsset) {
-      setForm({
-        name: editAsset.name,
-        assetTypeId: editAsset.assetTypeId,
-        color: editAsset.color,
-        ownershipPercent: editAsset.ownershipPercent.toString(),
-        purchaseDate: editAsset.purchaseDate.slice(0, 10),
-        purchasePrice: editAsset.purchasePrice.toString(),
-        notes: editAsset.notes ?? '',
-      })
-    } else {
-      setForm(EMPTY)
-    }
-  }, [open, editAsset])
 
   const mutation = useMutation({
     mutationFn: async () => {

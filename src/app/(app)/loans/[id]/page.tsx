@@ -130,7 +130,7 @@ export default function LoanDetailPage() {
   if (isLoading) {
     return <div className="p-6 space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-8 bg-muted rounded animate-pulse" />)}</div>
   }
-  if (!loan || (loan as any).error) {
+  if (!loan || ('error' in loan)) {
     return <div className="p-6 text-muted-foreground">Kredit nicht gefunden.</div>
   }
 

@@ -57,7 +57,6 @@ describe('withHandler', () => {
 
   it('returns the handler result on success', async () => {
     const handler = withHandler(async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { NextResponse } = await import('next/server')
       return NextResponse.json({ data: 'ok' })
     })
@@ -134,7 +133,7 @@ describe('withHandler', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const handler = withHandler(async () => {
-      throw 'string error' // eslint-disable-line no-throw-literal
+      throw 'string error'
     })
 
     const res = await handler(mockRequest, {})

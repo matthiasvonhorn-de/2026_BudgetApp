@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -32,21 +32,14 @@ const EMPTY: FormState = {
 export function PortfolioDialog({ open, onOpenChange, editPortfolio }: Props) {
   const qc = useQueryClient()
   const isEdit = !!editPortfolio
-  const [form, setForm] = useState<FormState>(EMPTY)
+  const [form, setForm] = useState<FormState>(() =>
+    editPortfolio ? {
+      name: editPortfolio.name,
+      color: editPortfolio.color,
+      notes: editPortfolio.notes ?? '',
+    } : EMPTY
+  )
   const set = (k: keyof FormState, v: string) => setForm(f => ({ ...f, [k]: v }))
-
-  useEffect(() => {
-    if (!open) return
-    if (editPortfolio) {
-      setForm({
-        name: editPortfolio.name,
-        color: editPortfolio.color,
-        notes: editPortfolio.notes ?? '',
-      })
-    } else {
-      setForm(EMPTY)
-    }
-  }, [open, editPortfolio])
 
   const mutation = useMutation({
     mutationFn: async () => {

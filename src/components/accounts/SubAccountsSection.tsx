@@ -45,35 +45,6 @@ function subAccountBalance(sub: SubAccount) {
   return sub.initialBalance + sub.groups.reduce((sum, g) => sum + groupBalance(g), 0)
 }
 
-// ---- Inline text editor ----
-function InlineEdit({
-  value,
-  onSave,
-  onCancel,
-}: {
-  value: string
-  onSave: (v: string) => void
-  onCancel: () => void
-}) {
-  const [val, setVal] = useState(value)
-  return (
-    <span className="flex items-center gap-1">
-      <input
-        autoFocus
-        className="border rounded px-1 py-0.5 text-sm w-36"
-        value={val}
-        onChange={e => setVal(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') onSave(val)
-          if (e.key === 'Escape') onCancel()
-        }}
-      />
-      <button onClick={() => onSave(val)} className="text-emerald-600 hover:text-emerald-700"><Check className="h-3.5 w-3.5" /></button>
-      <button onClick={onCancel} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
-    </span>
-  )
-}
-
 // ---- New entry row ----
 function NewEntryRow({ groupId, accountId, categoryId, onDone }: { groupId: string; accountId: string; categoryId?: string; onDone: () => void }) {
   const qc = useQueryClient()

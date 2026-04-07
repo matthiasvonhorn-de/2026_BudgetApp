@@ -20,7 +20,7 @@ export const PUT = withHandler(async (request: Request, ctx) => {
   const body = await request.json()
   const data = UpdatePaymentSchema.parse(body)
 
-  let loan = await prisma.loan.findUnique({
+  const loan = await prisma.loan.findUnique({
     where: { id },
     include: { payments: { orderBy: { periodNumber: 'asc' } } },
   })
@@ -40,7 +40,6 @@ export const PUT = withHandler(async (request: Request, ctx) => {
   const totalPayment = -(currentRow.scheduledPrincipal + currentRow.scheduledInterest + extraPayment)
 
   await prisma.$transaction(async (tx) => {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     let loanData = loan!
     // 1. categoryId dauerhaft am Kredit speichern (falls mitgeschickt und noch nicht gesetzt)
     if (data.categoryId !== undefined && data.categoryId !== loanData.categoryId) {

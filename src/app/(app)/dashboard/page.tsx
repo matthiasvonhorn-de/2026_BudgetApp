@@ -12,7 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
-import type { Account, Transaction, BudgetData, MonthlySummary, GroupSpending, GroupSpendingData, NetWorth } from '@/types/api'
+import type { Account, Transaction, BudgetData, MonthlySummary, GroupSpendingData, NetWorth } from '@/types/api'
 
 const MONTHS_DE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 

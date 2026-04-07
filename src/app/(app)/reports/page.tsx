@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -82,7 +82,6 @@ function CustomTooltipPie({ active, payload }: any) {
 function BalanceAreaChart({
   data, dataKey, stroke, height = 280, id,
 }: { data: Array<Record<string, unknown>>; dataKey: string; stroke: string; height?: number; id: string }) {
-  const fmt = useFormatCurrency()
   const fmtCompact = (v: number) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', notation: 'compact', maximumFractionDigits: 1 }).format(v)
 
   const values = data.map(d => d[dataKey] as number)
@@ -128,11 +127,10 @@ export default function ReportsPage() {
   })
   const budgetAccounts = accounts.filter(a => a.isActive && BUDGET_ACCOUNT_TYPES.includes(a.type))
 
-  useEffect(() => {
-    if (!selectedAccountId && budgetAccounts.length > 0) {
-      setSelectedAccountId(budgetAccounts[0].id)
-    }
-  }, [budgetAccounts, selectedAccountId])
+  const effectiveAccountId = useMemo(
+    () => selectedAccountId ?? budgetAccounts[0]?.id ?? null,
+    [selectedAccountId, budgetAccounts],
+  )
 
   const { data: monthlySummary = [] } = useQuery<MonthlySummary[]>({
     queryKey: ['reports-monthly-summary'],
@@ -140,9 +138,9 @@ export default function ReportsPage() {
   })
 
   const { data: groupSpendingData } = useQuery<GroupSpendingData>({
-    queryKey: ['reports-group-spending', selectedYear, selectedMonth, selectedAccountId],
-    queryFn: () => fetch(`/api/reports/category-spending?year=${selectedYear}&month=${selectedMonth}&accountId=${selectedAccountId}`).then(r => r.json()),
-    enabled: !!selectedAccountId,
+    queryKey: ['reports-group-spending', selectedYear, selectedMonth, effectiveAccountId],
+    queryFn: () => fetch(`/api/reports/category-spending?year=${selectedYear}&month=${selectedMonth}&accountId=${effectiveAccountId}`).then(r => r.json()),
+    enabled: !!effectiveAccountId,
   })
   const groupExpenses = groupSpendingData?.expenses ?? []
   const groupIncome = groupSpendingData?.income ?? []
@@ -153,9 +151,9 @@ export default function ReportsPage() {
   })
 
   const { data: accountBalance = [] } = useQuery<AccountBalanceMonth[]>({
-    queryKey: ['reports-account-balance', selectedAccountId],
-    queryFn: () => fetch(`/api/reports/account-balance?accountId=${selectedAccountId}&months=12`).then(r => r.json()),
-    enabled: !!selectedAccountId,
+    queryKey: ['reports-account-balance', effectiveAccountId],
+    queryFn: () => fetch(`/api/reports/account-balance?accountId=${effectiveAccountId}&months=12`).then(r => r.json()),
+    enabled: !!effectiveAccountId,
   })
 
   const balanceChartData = accountBalance.map((d) => ({
@@ -186,7 +184,7 @@ export default function ReportsPage() {
   }))
 
   // Budget vs. Ist data — filter by selected account, negate for expenses
-  const accountGroups = budgetData?.groups?.filter((g: BudgetGroup) => g.accountId === selectedAccountId) ?? []
+  const accountGroups = budgetData?.groups?.filter((g: BudgetGroup) => g.accountId === effectiveAccountId) ?? []
 
   const budgetVsActualExpense = accountGroups.flatMap((g: BudgetGroup) =>
     g.categories
@@ -230,7 +228,7 @@ export default function ReportsPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">Monatsübersicht</h2>
             <AppSelect
-              value={selectedAccountId ?? ''}
+              value={effectiveAccountId ?? ''}
               onValueChange={setSelectedAccountId}
               options={budgetAccounts.map(a => ({ value: a.id, label: a.name }))}
               placeholder="Konto"
@@ -364,7 +362,7 @@ export default function ReportsPage() {
             <h2 className="text-base font-semibold">Gruppenanalyse</h2>
             <div className="flex gap-2 items-center">
               <AppSelect
-                value={selectedAccountId ?? ''}
+                value={effectiveAccountId ?? ''}
                 onValueChange={setSelectedAccountId}
                 options={budgetAccounts.map(a => ({ value: a.id, label: a.name }))}
                 placeholder="Konto"
@@ -527,7 +525,7 @@ export default function ReportsPage() {
             <h2 className="text-base font-semibold">Budget vs. Ist</h2>
             <div className="flex gap-2 items-center">
               <AppSelect
-                value={selectedAccountId ?? ''}
+                value={effectiveAccountId ?? ''}
                 onValueChange={setSelectedAccountId}
                 options={budgetAccounts.map(a => ({ value: a.id, label: a.name }))}
                 placeholder="Konto"

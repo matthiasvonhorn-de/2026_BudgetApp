@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test'
 import {
   apiCreateSavings, apiDeleteSavings, apiGetSavings,
   monthsAgo, today,
+  type SavingsEntry,
 } from './helpers'
 
 const createdIds: string[] = []
@@ -59,7 +60,7 @@ test('3.2 Sparplan: Startkapital 5000 €, Laufzeit 12 Monate', async ({ page })
 
   const data = await apiGetSavings(id)
   // Erster INTEREST-Eintrag: scheduledBalance > 5000 (Startkapital hat Zinsen)
-  const firstInterest = data.entries.find((e: any) => e.entryType === 'INTEREST')
+  const firstInterest = data.entries.find((e: SavingsEntry) => e.entryType === 'INTEREST')
   expect(firstInterest.scheduledBalance).toBeGreaterThan(5000)
 
   // Aktueller Saldo ≥ 5000 (durch Auto-Initialisierung kann er schon höher sein)
@@ -100,7 +101,7 @@ test('3.3 Sparplan: kein Startkapital, unbegrenzte Laufzeit', async ({ page }) =
 })
 
 // 4. Startkapital=5000, unbegrenzt (startDate vor 6 Monaten)
-test('3.4 Sparplan: Startkapital 5000 €, unbegrenzte Laufzeit', async ({ page }) => {
+test('3.4 Sparplan: Startkapital 5000 €, unbegrenzte Laufzeit', async () => {
   const start = monthsAgo(6)
   const id = await apiCreateSavings({
     name: `SP-5k-inf-${Date.now()}`,
@@ -148,7 +149,7 @@ test('3.5 Festgeld: kein Startkapital, Laufzeit 12 Monate', async ({ page }) => 
 })
 
 // 6. Festgeld: Startkapital 10000, Laufzeit 12 Monate
-test('3.6 Festgeld: Startkapital 10.000 €, Laufzeit 12 Monate', async ({ page }) => {
+test('3.6 Festgeld: Startkapital 10.000 €, Laufzeit 12 Monate', async () => {
   const id = await apiCreateSavings({
     name: `FG-10k-12-${Date.now()}`,
     savingsType: 'FESTGELD',
@@ -167,7 +168,7 @@ test('3.6 Festgeld: Startkapital 10.000 €, Laufzeit 12 Monate', async ({ page 
 })
 
 // 7. Festgeld: kein Startkapital, unbegrenzt
-test('3.7 Festgeld: kein Startkapital, unbegrenzte Laufzeit', async ({ page }) => {
+test('3.7 Festgeld: kein Startkapital, unbegrenzte Laufzeit', async () => {
   const id = await apiCreateSavings({
     name: `FG-0-inf-${Date.now()}`,
     savingsType: 'FESTGELD',

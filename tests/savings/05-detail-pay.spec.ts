@@ -2,7 +2,8 @@
 import { test, expect } from '@playwright/test'
 import {
   apiCreateSavings, apiDeleteSavings, apiCreateGiro, apiDeleteAccount,
-  today, monthsFromNow, monthsAgo,
+  today, monthsAgo,
+  type SavingsEntry,
 } from './helpers'
 
 const BASE = 'http://localhost:3000'
@@ -146,16 +147,16 @@ test('5.6 API: initializedUntil markiert Einträge ohne Transaktionen', async ()
   })
 
   const res = await fetch(`${BASE}/api/savings/${id}`)
-  const data = await res.json()
+  const data: { entries: SavingsEntry[] } = await res.json()
 
   // Einträge bis einschließlich twoMonthsAgo: paidAt gesetzt, transactionId null
-  const initEntries = data.entries.filter((e: any) =>
+  const initEntries = data.entries.filter((e: SavingsEntry) =>
     e.paidAt !== null && e.transactionId === null
   )
   expect(initEntries.length).toBeGreaterThan(0)
 
   // Keine echten Transaktionen: alle initialisierten Einträge haben transactionId === null
-  const withTransaction = data.entries.filter((e: any) => e.transactionId !== null)
+  const withTransaction = data.entries.filter((e: SavingsEntry) => e.transactionId !== null)
   expect(withTransaction.length).toBe(0)
 
   await apiDeleteSavings(id).catch(() => {})
@@ -163,8 +164,8 @@ test('5.6 API: initializedUntil markiert Einträge ohne Transaktionen', async ()
 
 test('5.7 API: initializedUntil legt keine Gegenbuchung auf Girokonto an', async () => {
   const giro2Id = await apiCreateGiro(`Giro-InitTest-${Date.now()}`)
-  const balanceBefore = (await (await fetch(`${BASE}/api/accounts`)).json())
-    .find((a: any) => a.id === giro2Id)?.currentBalance ?? 0
+  const balanceBefore = (await apiGetAccounts())
+    .find(a => a.id === giro2Id)?.currentBalance ?? 0
 
   const id = await apiCreateSavings({
     name: `InitGiro-${Date.now()}`,
@@ -180,8 +181,8 @@ test('5.7 API: initializedUntil legt keine Gegenbuchung auf Girokonto an', async
     initializedUntil: monthsAgo(1),
   })
 
-  const balanceAfter = (await (await fetch(`${BASE}/api/accounts`)).json())
-    .find((a: any) => a.id === giro2Id)?.currentBalance ?? 0
+  const balanceAfter = (await apiGetAccounts())
+    .find(a => a.id === giro2Id)?.currentBalance ?? 0
 
   // Girokonto-Saldo unverändert — keine Gegenbuchungen bei Initialisierung
   expect(balanceAfter).toBe(balanceBefore)

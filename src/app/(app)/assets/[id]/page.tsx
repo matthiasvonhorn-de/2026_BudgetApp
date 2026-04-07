@@ -458,6 +458,7 @@ export default function AssetDetailPage() {
       </div>
 
       <AssetDialog
+        key={`${editDialogOpen ? 'open' : 'closed'}-${asset?.id ?? 'new'}`}
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         editAsset={asset}

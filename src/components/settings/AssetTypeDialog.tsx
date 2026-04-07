@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -52,17 +52,10 @@ const EMPTY: FormState = {
 export function AssetTypeDialog({ open, onOpenChange, editType }: Props) {
   const qc = useQueryClient()
   const isEdit = !!editType
-  const [form, setForm] = useState<FormState>(EMPTY)
+  const [form, setForm] = useState<FormState>(() =>
+    editType ? { name: editType.name, icon: editType.icon, color: editType.color } : EMPTY
+  )
   const set = (k: keyof FormState, v: string) => setForm(f => ({ ...f, [k]: v }))
-
-  useEffect(() => {
-    if (!open) return
-    if (editType) {
-      setForm({ name: editType.name, icon: editType.icon, color: editType.color })
-    } else {
-      setForm(EMPTY)
-    }
-  }, [open, editType])
 
   const mutation = useMutation({
     mutationFn: async () => {

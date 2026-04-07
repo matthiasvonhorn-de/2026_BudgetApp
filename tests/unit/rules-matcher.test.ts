@@ -1,20 +1,22 @@
 // /Users/matthiasvonhorn/Documents/4. Projekte/2026_BudgetApp/tests/unit/rules-matcher.test.ts
 import { describe, it, expect } from 'vitest'
+import { RuleField, RuleOperator, type CategoryRule } from '@prisma/client'
 import { applyRules, type RawTransaction } from '@/lib/rules/matcher'
 
 // Helper to create a mock CategoryRule with the fields that matcher.ts actually uses
 function mockRule(overrides: {
-  field: 'DESCRIPTION' | 'PAYEE' | 'AMOUNT'
-  operator: 'CONTAINS' | 'STARTS_WITH' | 'ENDS_WITH' | 'EQUALS' | 'GREATER_THAN' | 'LESS_THAN' | 'REGEX'
+  field: keyof typeof RuleField
+  operator: keyof typeof RuleOperator
   value: string
   categoryId: string
   priority?: number
   isActive?: boolean
-}) {
+}): CategoryRule {
   return {
     id: 'rule-' + Math.random().toString(36).slice(2),
-    field: overrides.field,
-    operator: overrides.operator,
+    name: 'mock-rule',
+    field: RuleField[overrides.field],
+    operator: RuleOperator[overrides.operator],
     value: overrides.value,
     categoryId: overrides.categoryId,
     priority: overrides.priority ?? 1,
@@ -22,7 +24,7 @@ function mockRule(overrides: {
     accountId: 'acc-1',
     createdAt: new Date(),
     updatedAt: new Date(),
-  } as any // Cast to CategoryRule to satisfy the type without importing Prisma enums
+  }
 }
 
 const baseTx: RawTransaction = {

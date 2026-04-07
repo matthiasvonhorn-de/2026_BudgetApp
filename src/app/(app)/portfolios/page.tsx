@@ -112,7 +112,7 @@ export default function PortfoliosPage() {
         </div>
       )}
 
-      <PortfolioDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <PortfolioDialog key={`portfolio-new-${dialogOpen ? 'open' : 'closed'}`} open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   )
 }

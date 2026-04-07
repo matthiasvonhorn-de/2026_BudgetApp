@@ -121,6 +121,7 @@ export default function PortfoliosSettingsPage() {
       )}
 
       <PortfolioDialog
+        key={`${dialogOpen ? 'open' : 'closed'}-${editPortfolio?.id ?? 'new'}`}
         open={dialogOpen}
         onOpenChange={closeDialog}
         editPortfolio={editPortfolio}

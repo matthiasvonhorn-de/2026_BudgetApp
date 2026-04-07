@@ -409,10 +409,10 @@ export default function TransactionsPage() {
           <p className="text-sm text-muted-foreground">
             Diese Transaktion wurde automatisch beim Buchen von{' '}
             <strong>Rate {pendingDelete?.loanPayment.periodNumber}</strong> des Kredits{' '}
-            <strong>„{pendingDelete?.loanPayment.loan.name}"</strong> erstellt.
+            <strong>„{pendingDelete?.loanPayment.loan.name}{'"'}</strong> erstellt.
           </p>
           <p className="text-sm text-muted-foreground">
-            Soll der Zahlungsstatus der Rate ebenfalls auf <strong>„Offen"</strong> zurückgesetzt werden?
+            Soll der Zahlungsstatus der Rate ebenfalls auf <strong>„Offen{'"'}</strong> zurückgesetzt werden?
           </p>
           <DialogFooter className="flex-col gap-2 sm:flex-col">
             <Button
