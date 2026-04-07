@@ -48,11 +48,13 @@ function migrate(userDbPath, bundledDbPath, migrationsDir) {
       })()
     }
 
-    // Apply manual migrations
+    // Apply manual migrations (each in its own transaction for safety)
     if (manualMigrations.length > 0) {
       for (const migration of manualMigrations) {
         const sql = fs.readFileSync(migration.path, 'utf-8')
-        userDb.exec(sql)
+        userDb.transaction(() => {
+          userDb.exec(sql)
+        })()
         result.changes.push(`Manual migration: ${migration.name}`)
       }
     }
@@ -239,6 +241,12 @@ function createBackup(dbPath) {
     String(now.getSeconds()).padStart(2, '0'),
   ].join('')
   const backupPath = path.join(dir, `budget-backup-${ts}.db`)
+
+  // Flush WAL to main file before copying so the backup is consistent
+  const db = new Database(dbPath)
+  db.pragma('wal_checkpoint(TRUNCATE)')
+  db.close()
+
   fs.copyFileSync(dbPath, backupPath)
   console.log(`[BudgetApp] Backup created: ${backupPath}`)
   return backupPath

@@ -47,10 +47,8 @@ const indexes = devDb
 
 devDb.close()
 
-// Create fresh empty.db
+// Create fresh empty.db (no WAL mode — let the app set it at runtime)
 const emptyDb = new Database(emptyDbPath)
-
-emptyDb.exec('PRAGMA journal_mode=WAL')
 
 emptyDb.transaction(() => {
   for (const { sql } of tables) {

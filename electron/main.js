@@ -113,9 +113,12 @@ function runMigration() {
     }
   } catch (err) {
     console.error('[BudgetApp] Migration failed:', err)
+    const backupHint = fs.readdirSync(path.dirname(dbPath)).some((f) => f.startsWith('budget-backup-'))
+      ? '\n\nEin Backup wurde im Datenverzeichnis erstellt.'
+      : ''
     dialog.showErrorBox(
       'BudgetApp – Datenbankfehler',
-      `Die Datenbank konnte nicht aktualisiert werden.\n\n${err.message}\n\nEin Backup wurde im Datenverzeichnis erstellt.`
+      `Die Datenbank konnte nicht aktualisiert werden.\n\n${err.message}${backupHint}`
     )
   }
 
