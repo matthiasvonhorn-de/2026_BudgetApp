@@ -16,7 +16,7 @@ export interface ParseResult {
   skippedRows: number
 }
 
-function parseAmount(value: string, fmt: 'DE' | 'EN'): number {
+export function parseAmount(value: string, fmt: 'DE' | 'EN'): number {
   if (!value || value.trim() === '' || value.trim() === '-') return 0
   let cleaned = value.trim().replace(/\s/g, '')
   if (fmt === 'DE') {
@@ -29,7 +29,7 @@ function parseAmount(value: string, fmt: 'DE' | 'EN'): number {
   return parseFloat(cleaned) || 0
 }
 
-function parseDate(value: string, dateFormat: string): Date | null {
+export function parseDate(value: string, dateFormat: string): Date | null {
   if (!value) return null
   const cleaned = value.trim()
 
@@ -56,7 +56,7 @@ function parseDate(value: string, dateFormat: string): Date | null {
   return null
 }
 
-async function computeHash(str: string): Promise<string> {
+export async function computeHash(str: string): Promise<string> {
   if (typeof window !== 'undefined' && window.crypto?.subtle) {
     const buf = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
