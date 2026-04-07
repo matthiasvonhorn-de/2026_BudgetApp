@@ -43,6 +43,7 @@ node_modules/
 dist/
 prisma/dev.db
 prisma/prod.db
+prisma/test.db
 
 # Playwright MCP artifacts
 .playwright-mcp/
