@@ -3,13 +3,21 @@
 import Link from 'next/link'
 import { useSettingsStore, CURRENCY_PRESETS } from '@/store/useSettingsStore'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useTheme } from 'next-themes'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Check, ArrowLeft } from 'lucide-react'
+import { Check, ArrowLeft, Sun, Moon, Monitor } from 'lucide-react'
+
+const THEME_OPTIONS = [
+  { value: 'light', label: 'Helles Design', icon: Sun },
+  { value: 'dark', label: 'Dunkles Design', icon: Moon },
+  { value: 'system', label: 'Systemeinstellung', icon: Monitor },
+] as const
 
 export default function GeneralSettingsPage() {
   const { currency, locale, setCurrencyPreset } = useSettingsStore()
   const fmt = useFormatCurrency()
+  const { theme, setTheme } = useTheme()
 
   return (
     <div className="p-6 max-w-2xl space-y-6">
@@ -22,6 +30,33 @@ export default function GeneralSettingsPage() {
         </Link>
         <h1 className="text-2xl font-bold">Allgemein</h1>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Darstellung</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {THEME_OPTIONS.map(option => {
+            const Icon = option.icon
+            const isActive = theme === option.value
+            return (
+              <button
+                key={option.value}
+                onClick={() => setTheme(option.value)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-sm transition-colors ${
+                  isActive ? 'border-primary bg-primary/5 font-medium' : 'border-border hover:bg-muted'
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <Icon className="h-4 w-4" />
+                  {option.label}
+                </span>
+                {isActive && <Check className="h-4 w-4 text-primary" />}
+              </button>
+            )
+          })}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
