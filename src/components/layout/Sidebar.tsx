@@ -12,11 +12,8 @@ import {
   Upload,
   Settings,
   Wallet,
-  Moon,
-  Sun,
   Landmark,
 } from 'lucide-react'
-import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -33,7 +30,6 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { resolvedTheme, setTheme } = useTheme()
 
   return (
     <aside className="w-60 border-r bg-card flex flex-col">
@@ -64,15 +60,6 @@ export function Sidebar() {
           )
         })}
       </nav>
-      <div className="p-3 border-t">
-        <button
-          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors w-full"
-        >
-          {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          {resolvedTheme === 'dark' ? 'Helles Design' : 'Dunkles Design'}
-        </button>
-      </div>
     </aside>
   )
 }
