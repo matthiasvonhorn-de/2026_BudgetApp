@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 
@@ -19,11 +20,9 @@ export const GET = withHandler(async () => {
   const accountIds = [...new Set(subAccounts.map(sa => sa.accountId))]
   let categorizedAccountsBalance = 0
   if (accountIds.length > 0) {
-    const placeholders = accountIds.map(() => '?').join(',')
-    const rows = await prisma.$queryRawUnsafe<Array<{ total: number }>>(
-      `SELECT SUM(COALESCE(mainAmount, 0)) as total FROM "Transaction" WHERE accountId IN (${placeholders})`,
-      ...accountIds,
-    )
+    const rows = await prisma.$queryRaw<Array<{ total: number }>>`
+      SELECT SUM(COALESCE(mainAmount, 0)) as total FROM "Transaction" WHERE accountId IN (${Prisma.join(accountIds)})
+    `
     categorizedAccountsBalance = rows[0]?.total ?? 0
   }
 

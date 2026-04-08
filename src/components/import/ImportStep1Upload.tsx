@@ -12,6 +12,7 @@ import { applyRules } from '@/lib/rules/matcher'
 import type { CategoryRule } from '@prisma/client'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 
 export function ImportStep1Upload() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -67,7 +68,7 @@ export function ImportStep1Upload() {
       setStep(2)
     } catch (e) {
       toast.error('Fehler beim Parsen der Datei')
-      console.error(e)
+      logger.error('CSV parse error:', e)
     }
     setIsProcessing(false)
   }

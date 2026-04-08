@@ -8,16 +8,21 @@ import type { createSavingsSchema, updateSavingsSchema } from '@/lib/schemas/sav
 type CreateInput = z.infer<typeof createSavingsSchema>
 type UpdateInput = z.infer<typeof updateSavingsSchema>
 
+/** Average milliseconds per month for approximate date math */
+const AVG_MS_PER_MONTH = 30.44 * 24 * 60 * 60 * 1000
+/** Default number of months to generate schedule entries into the future */
+const DEFAULT_FORECAST_MONTHS = 24
+
 /**
  * For fixed-term plans: use termMonths exactly.
  * For unlimited plans: generate from startDate through today + 24 months.
  */
 function computeScheduleMonths(startDate: Date, termMonths: number | null): number {
   if (termMonths !== null) return termMonths
-  const horizon = addMonths(new Date(), 24)
+  const horizon = addMonths(new Date(), DEFAULT_FORECAST_MONTHS)
   const diffMs = Math.max(0, horizon.getTime() - startDate.getTime())
-  const months = Math.ceil(diffMs / (30.44 * 24 * 60 * 60 * 1000))
-  return Math.max(months, 24)
+  const months = Math.ceil(diffMs / AVG_MS_PER_MONTH)
+  return Math.max(months, DEFAULT_FORECAST_MONTHS)
 }
 
 // ── List ──────────────────────────────────────────────────────────────
@@ -287,8 +292,8 @@ export async function updateSavings(accountId: string, data: UpdateInput) {
     const lastEntryDate = lastContrib?.dueDate ?? config.entries[config.entries.length - 1]?.dueDate
 
     const remainingMonths = lastEntryDate
-      ? Math.max(Math.round((lastEntryDate.getTime() - rebuildFrom.getTime()) / (30.44 * 24 * 60 * 60 * 1000)), 1) + 1
-      : 24
+      ? Math.max(Math.round((lastEntryDate.getTime() - rebuildFrom.getTime()) / AVG_MS_PER_MONTH), 1) + 1
+      : DEFAULT_FORECAST_MONTHS
 
     if (remainingMonths > 0) {
       const newSchedule = generateSavingsSchedule({
@@ -563,7 +568,7 @@ export async function extendSavings(accountId: string, months: number) {
     : config.startDate
 
   const monthsNeeded = Math.ceil(
-    (horizon.getTime() - extendFrom.getTime()) / (30.44 * 24 * 60 * 60 * 1000)
+    (horizon.getTime() - extendFrom.getTime()) / AVG_MS_PER_MONTH
   ) + interestPeriodMonths
 
   if (monthsNeeded <= 0) return { added: 0 }

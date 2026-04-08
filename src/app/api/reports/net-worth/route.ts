@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { withHandler } from '@/lib/api/handler'
 import { roundCents } from '@/lib/money'
@@ -21,16 +22,13 @@ export const GET = withHandler(async (request: Request) => {
   const accountIds = accounts.map(a => a.id)
   let futureRows: Array<{ accountId: string; total: number }> = []
   if (accountIds.length > 0) {
-    const placeholders = accountIds.map(() => '?').join(',')
-    futureRows = await prisma.$queryRawUnsafe<Array<{ accountId: string; total: number }>>(
-      `SELECT accountId, SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
-       FROM "Transaction"
-       WHERE accountId IN (${placeholders})
-         AND date > ?
-       GROUP BY accountId`,
-      ...accountIds,
-      endOfMonth,
-    ).catch(() => [] as Array<{ accountId: string; total: number }>)
+    futureRows = await prisma.$queryRaw<Array<{ accountId: string; total: number }>>`
+      SELECT accountId, SUM(COALESCE(mainAmount, 0) + COALESCE(subAmount, 0)) as total
+      FROM "Transaction"
+      WHERE accountId IN (${Prisma.join(accountIds)})
+        AND date > ${endOfMonth}
+      GROUP BY accountId
+    `.catch(() => [] as Array<{ accountId: string; total: number }>)
   }
 
   const futureMap = new Map(futureRows.map(t => [t.accountId, t.total]))

@@ -1,6 +1,7 @@
 import { ZodError } from 'zod'
 import { NextResponse } from 'next/server'
 import { DomainError } from './errors'
+import { logger } from '../logger'
 
 // ctx typed as unknown — Next.js App Router passes { params: Promise<...> } which
 // each handler resolves itself. Using unknown here avoids any without lying about the type.
@@ -17,7 +18,7 @@ export function withHandler(fn: RouteHandler): RouteHandler {
         }, { status: 400 })
       if (e instanceof DomainError)
         return NextResponse.json({ error: e.message }, { status: e.status })
-      console.error(e)
+      logger.error(e)
       return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
   }
