@@ -21,7 +21,7 @@ import { SubAccountsSection } from '@/components/accounts/SubAccountsSection'
 import { AccountBudgetTab } from '@/components/accounts/AccountBudgetTab'
 import { TransactionFormDialog } from '@/components/transactions/TransactionFormDialog'
 import { toast } from 'sonner'
-import type { Transaction } from '@/types/api'
+import type { Transaction, TransactionPage } from '@/types/api'
 
 const TABS = ['Transaktionen', 'Unterkonten', 'Budget'] as const
 type Tab = typeof TABS[number]
@@ -52,17 +52,45 @@ export default function AccountDetailPage() {
 
   const fmt = useFormatCurrency()
 
-  const deleteMutation = useMutation({
-    mutationFn: (txId: string) =>
+  const deleteMutation = useMutation<
+    unknown,
+    Error,
+    string,
+    { queryKeys: [readonly unknown[], TransactionPage | undefined][] }
+  >({
+    mutationFn: (txId) =>
       fetch(`/api/transactions/${txId}`, { method: 'DELETE' }).then(r => r.json()),
+    onMutate: async (txId) => {
+      await queryClient.cancelQueries({ queryKey: ['account-transactions'] })
+      const queryKeys = queryClient.getQueriesData<TransactionPage>({ queryKey: ['account-transactions'] })
+      queryClient.setQueriesData<TransactionPage>({ queryKey: ['account-transactions'] }, (old) => {
+        if (!old?.data) return old
+        return {
+          ...old,
+          data: old.data.filter((t) => t.id !== txId),
+          total: old.total - 1,
+        }
+      })
+      return { queryKeys }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.queryKeys) {
+        for (const [key, data] of context.queryKeys) {
+          queryClient.setQueryData(key, data)
+        }
+      }
+      toast.error('Fehler beim Löschen')
+    },
     onSuccess: () => {
+      toast.success('Transaktion gelöscht')
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['account-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
       queryClient.invalidateQueries({ queryKey: ['account-budget'] })
       queryClient.invalidateQueries({ queryKey: ['budget'] })
-      toast.success('Transaktion gelöscht')
     },
   })
   const { data: account, isLoading } = useQuery({

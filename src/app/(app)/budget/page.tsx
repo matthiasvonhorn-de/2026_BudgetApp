@@ -53,8 +53,13 @@ export default function BudgetPage() {
     queryFn: () => fetch(`/api/budget/${budgetYear}/${budgetMonth}`).then(r => r.json()),
   })
 
-  const saveMutation = useMutation({
-    mutationFn: async ({ categoryId, budgeted }: { categoryId: string; budgeted: number }) => {
+  const saveMutation = useMutation<
+    unknown,
+    Error,
+    { categoryId: string; budgeted: number },
+    { previous?: BudgetData }
+  >({
+    mutationFn: async ({ categoryId, budgeted }) => {
       const res = await fetch(`/api/budget/${budgetYear}/${budgetMonth}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -63,10 +68,33 @@ export default function BudgetPage() {
       if (!res.ok) throw new Error('Fehler')
       return res.json()
     },
-    onSuccess: () => {
+    onMutate: async ({ categoryId, budgeted }) => {
+      const queryKey = ['budget', budgetYear, budgetMonth] as const
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<BudgetData>(queryKey)
+      queryClient.setQueryData<BudgetData>(queryKey, (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          groups: old.groups.map((g) => ({
+            ...g,
+            categories: g.categories.map((c) =>
+              c.id === categoryId ? { ...c, budgeted } : c
+            ),
+          })),
+        }
+      })
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['budget', budgetYear, budgetMonth], context.previous)
+      }
+      toast.error('Fehler beim Speichern')
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['budget', budgetYear, budgetMonth] })
     },
-    onError: () => toast.error('Fehler beim Speichern'),
   })
 
   const rolloverMutation = useMutation({
