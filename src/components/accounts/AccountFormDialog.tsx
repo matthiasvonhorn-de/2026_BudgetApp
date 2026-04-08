@@ -124,6 +124,8 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
     enabled: open && isEdit && isSavingsType(account?.type),
   })
 
+  const isSavings = isSavingsType(form.type)
+
   // Load accounts for linked account dropdown
   const { data: allAccounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts'],
@@ -176,7 +178,6 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
   // Keep date init refs in sync with form template (updated during render — safe for refs)
   startDateInitRef.current = form.startDate
 
-  const isSavings = isSavingsType(form.type)
   const isSparplan = form.type === 'SPARPLAN'
 
   // Load categories for linked account
