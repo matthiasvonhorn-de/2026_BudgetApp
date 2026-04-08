@@ -6,304 +6,15 @@ import { Button } from '@/components/ui/button'
 import { useUIStore } from '@/store/useUIStore'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { getMonthName } from '@/lib/budget/calculations'
-import { formatDate } from '@/lib/utils'
-import { useState, useRef, Fragment } from 'react'
+import { useState, useRef } from 'react'
 import { toast } from 'sonner'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AccountBudgetConfig } from '@/components/accounts/AccountBudgetConfig'
-import type { Transaction, Account } from '@/types/api'
-
-// ── Typen ────────────────────────────────────────────────────────────────────
-
-interface CategoryData {
-  id: string
-  name: string
-  color: string
-  type: string
-  budgeted: number
-  rolledOver: number
-  activity: number
-  available: number
-  subAccountGroupId: string | null
-  subAccountLinkType: string
-}
-
-interface GroupData {
-  id: string
-  name: string
-  categories: CategoryData[]
-}
-
-interface AccountBudgetData {
-  account: { id: string; name: string; color: string }
-  year: number
-  month: number
-  openingBalance: number
-  openingBalancePlan: number
-  subAccountsBalance: number
-  groups: GroupData[]
-  summary: {
-    totalBudgeted: number
-    totalActivity: number
-    closingBalancePlan: number
-    closingBalanceActual: number
-  }
-}
-
-interface BookDialogState {
-  open: boolean
-  cat?: CategoryData
-}
-
-// ── Transaktionsdetail-Dialog ─────────────────────────────────────────────────
-
-function CategoryActivityDialog({
-  open, onClose, cat, accountId, year, month,
-}: {
-  open: boolean
-  onClose: () => void
-  cat: CategoryData | undefined
-  accountId: string
-  year: number
-  month: number
-}) {
-  const fmt = useFormatCurrency()
-  const lastDay = new Date(year, month, 0).getDate()
-  const from = `${year}-${String(month).padStart(2, '0')}-01`
-  const to = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-
-  const { data: transactions = [], isLoading } = useQuery<Transaction[]>({
-    queryKey: ['transactions-detail', accountId, cat?.id, year, month],
-    queryFn: () =>
-      fetch(`/api/transactions?accountId=${accountId}&categoryId=${cat!.id}&from=${from}&to=${to}`)
-        .then(r => r.json().then(r => r.data)),
-    enabled: open && !!cat,
-  })
-
-  if (!cat) return null
-
-  return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-              {cat.name} — {getMonthName(month, year)}
-            </div>
-          </DialogTitle>
-        </DialogHeader>
-        <div className="overflow-y-auto flex-1">
-          {isLoading ? (
-            <div className="py-8 text-center text-muted-foreground text-sm">Laden...</div>
-          ) : transactions.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground text-sm">Keine Transaktionen in diesem Monat</div>
-          ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left p-3 font-medium">Datum</th>
-                    <th className="text-left p-3 font-medium">Beschreibung</th>
-                    <th className="text-right p-3 font-medium">Betrag</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transactions.map((t: Transaction) => (
-                    <tr key={t.id} className="border-t hover:bg-muted/50">
-                      <td className="p-3 text-muted-foreground whitespace-nowrap">{formatDate(t.date)}</td>
-                      <td className="p-3">
-                        <p className="font-medium">{t.description}</p>
-                        {t.payee && <p className="text-xs text-muted-foreground">{t.payee}</p>}
-                      </td>
-                      {(() => {
-                        const displayAmt = (t.mainAmount ?? 0) + (t.subAmount ?? 0)
-                        return (
-                          <td className={`p-3 text-right font-semibold tabular-nums ${displayAmt < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                            {fmt(displayAmt)}
-                          </td>
-                        )
-                      })()}
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t bg-muted/50 font-semibold">
-                    <td colSpan={2} className="p-3 text-right text-sm text-muted-foreground">Summe</td>
-                    <td className={`p-3 text-right tabular-nums ${amountColor(cat.activity)}`}>
-                      {fmt(cat.activity)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ── Buchen-Dialog ────────────────────────────────────────────────────────────
-
-function BookTransactionDialog({
-  state, onClose, accounts, accountId, budgetYear, budgetMonth,
-}: {
-  state: BookDialogState
-  onClose: () => void
-  accounts: Account[]
-  accountId: string
-  budgetYear: number
-  budgetMonth: number
-}) {
-  const qc = useQueryClient()
-  const fmt = useFormatCurrency()
-  const defaultDate = `${budgetYear}-${String(budgetMonth).padStart(2, '0')}-01`
-
-  const [selAccountId, setSelAccountId] = useState(accountId)
-  const [date, setDate] = useState(defaultDate)
-  const [description, setDescription] = useState(state.cat?.name ?? '')
-  const [amount, setAmount] = useState(state.cat ? Math.abs(state.cat.budgeted).toFixed(2) : '')
-
-  const [skipSubAccountEntry, setSkipSubAccountEntry] = useState(false)
-  const [skipPairedTransfer, setSkipPairedTransfer] = useState(false)
-
-  const [lastCatId, setLastCatId] = useState<string | undefined>()
-  if (state.open && state.cat && state.cat.id !== lastCatId) {
-    setLastCatId(state.cat.id)
-    setSelAccountId(accountId)
-    setDate(defaultDate)
-    setDescription(state.cat.name)
-    setAmount(Math.abs(state.cat.budgeted).toFixed(2))
-    setSkipSubAccountEntry(false)
-    setSkipPairedTransfer(false)
-  }
-
-  const bookMutation = useMutation({
-    mutationFn: () => {
-      if (!state.cat) throw new Error()
-      const raw = parseFloat(amount.replace(',', '.'))
-      const mainAmount = state.cat.type === 'INCOME' ? Math.abs(raw) : -Math.abs(raw)
-      return fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          date, mainAmount, mainType: state.cat.type as 'INCOME' | 'EXPENSE' | 'TRANSFER',
-          description,
-          accountId: selAccountId,
-          categoryId: state.cat.id,
-          skipSubAccountEntry,
-          skipPairedTransfer,
-        }),
-      }).then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() })
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['account-budget'] })
-      qc.invalidateQueries({ queryKey: ['budget'] })
-      qc.invalidateQueries({ queryKey: ['accounts'] })
-      qc.invalidateQueries({ queryKey: ['transactions'] })
-      toast.success('Transaktion gebucht')
-      onClose()
-    },
-    onError: () => toast.error('Fehler beim Buchen'),
-  })
-
-  if (!state.cat) return null
-  const typeLabel = state.cat.type === 'INCOME' ? 'Einnahme' : state.cat.type === 'EXPENSE' ? 'Ausgabe' : 'Transfer'
-  const typeColor = state.cat.type === 'INCOME' ? 'text-emerald-600' : state.cat.type === 'EXPENSE' ? 'text-destructive' : 'text-muted-foreground'
-
-  return (
-    <Dialog open={state.open} onOpenChange={v => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Planwert als Transaktion buchen</DialogTitle></DialogHeader>
-        <div className="space-y-4 py-1">
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 text-sm">
-            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: state.cat.color }} />
-            <span className="font-medium">{state.cat.name}</span>
-            <span className={`ml-auto font-semibold tabular-nums ${typeColor}`}>
-              {typeLabel} · {fmt(state.cat.budgeted)}
-            </span>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Konto *</Label>
-            <Select
-              value={selAccountId}
-              onValueChange={(v: string | null) => v && setSelAccountId(v)}
-              items={accounts.map((a: Account) => ({ value: a.id, label: a.name }))}
-              itemToStringLabel={(v: string) => accounts.find((a: Account) => a.id === v)?.name ?? v}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="—" />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((a: Account) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Datum</Label>
-            <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Beschreibung</Label>
-            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Beschreibung" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Betrag</Label>
-            <Input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} />
-          </div>
-          {state.cat.subAccountGroupId && (
-            <div className="space-y-2 pt-2 border-t">
-              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={skipSubAccountEntry}
-                  onChange={e => {
-                    setSkipSubAccountEntry(e.target.checked)
-                    if (e.target.checked) setSkipPairedTransfer(true)
-                    else setSkipPairedTransfer(false)
-                  }}
-                />
-                <span>Unterkonto-Eintrag überspringen</span>
-              </label>
-              {state.cat.subAccountLinkType === 'TRANSFER' && (
-                <label className={`flex items-center gap-2 text-sm select-none ${skipSubAccountEntry ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
-                  <input
-                    type="checkbox"
-                    checked={skipPairedTransfer}
-                    disabled={skipSubAccountEntry}
-                    onChange={e => setSkipPairedTransfer(e.target.checked)}
-                  />
-                  <span>Gegenbuchung überspringen</span>
-                </label>
-              )}
-            </div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Abbrechen</Button>
-          <Button
-            onClick={() => bookMutation.mutate()}
-            disabled={bookMutation.isPending || !selAccountId || !description.trim() || !amount}
-          >
-            {bookMutation.isPending ? 'Buchen...' : 'Transaktion buchen'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ── Hilfsfunktionen ──────────────────────────────────────────────────────────
-
-function amountColor(v: number) {
-  return v < 0 ? 'text-destructive' : v > 0 ? 'text-emerald-600' : 'text-muted-foreground'
-}
+import { CategoryActivityDialog } from './budget/CategoryActivityDialog'
+import { BookTransactionDialog } from './budget/BookTransactionDialog'
+import { BudgetTableBody } from './budget/BudgetTableBody'
+import { amountColor } from './budget/utils'
+import type { AccountBudgetData, BookDialogState, CategoryData } from './budget/types'
+import type { Account } from '@/types/api'
 
 // ── Haupt-Komponente ─────────────────────────────────────────────────────────
 
@@ -468,7 +179,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               </td>
             </tr>
 
-            {/* ── 1. Gesamtsaldo ───────────────────────────────────── */}
+            {/* 1. Gesamtsaldo */}
             <tr className="bg-blue-100/80 dark:bg-blue-900/30 font-bold">
               <td colSpan={2} className="px-3 py-1 border border-border text-right text-xs font-bold text-foreground">
                 Gesamtsaldo
@@ -485,7 +196,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               <td className="px-3 py-1 border border-border" />
             </tr>
 
-            {/* ── 2. Saldo Unterkonten (nur wenn vorhanden) ─────────── */}
+            {/* 2. Saldo Unterkonten (nur wenn vorhanden) */}
             {subAccountsBalance !== 0 && (
               <tr className="bg-blue-50/70 dark:bg-blue-950/25">
                 <td className="px-3 py-1 border border-border" />
@@ -505,7 +216,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               </tr>
             )}
 
-            {/* ── 3. Saldo Hauptkonto ───────────────────────────────── */}
+            {/* 3. Saldo Hauptkonto */}
             <tr className="bg-blue-50/70 dark:bg-blue-950/25">
               <td className="px-3 py-1 border border-border" />
               <td className="px-3 py-1 border border-border text-right text-xs font-semibold text-muted-foreground">
@@ -523,7 +234,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               <td className="px-3 py-1 border border-border" />
             </tr>
 
-            {/* ── Spaltenköpfe ──────────────────────────────────────────── */}
+            {/* Spaltenkoepfe */}
             <tr className="bg-muted border-t-2 border-border">
               <th className="text-left px-3 py-2 font-semibold border border-border w-28">Datum</th>
               <th className="text-left px-3 py-2 font-semibold border border-border">Beschreibung</th>
@@ -534,155 +245,27 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
             </tr>
           </thead>
 
-          <tbody>
-            {/* ── Saldoübertrag aus Vormonat ─────────────────────────── */}
-            <tr className="bg-slate-100 dark:bg-slate-800/50 font-semibold">
-              <td className="px-3 py-1.5 border border-border text-xs text-muted-foreground">
-                {`01.${String(budgetMonth).padStart(2, '0')}.${budgetYear}`}
-              </td>
-              <td className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Saldoübertrag aus Vormonat
-              </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(openingPlan)}`}>
-                {fmt(openingPlan)}
-              </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening)}`}>
-                {fmt(opening)}
-              </td>
-              <td className={`px-3 py-1.5 border border-border text-right tabular-nums ${amountColor(opening - openingPlan)}`}>
-                {fmt(opening - openingPlan)}
-              </td>
-              <td className="px-3 py-1.5 border border-border" />
-            </tr>
-
-            {/* ── Kategoriegruppen ──────────────────────────────────── */}
-            {groups.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">
-                  Keine Kategoriegruppen konfiguriert.{' '}
-                  <button
-                    onClick={() => setConfigOpen(true)}
-                    className="text-primary hover:underline"
-                  >
-                    Gruppen zuweisen
-                  </button>
-                </td>
-              </tr>
-            ) : (
-              groups.map(group => {
-                const groupBudgeted = group.categories.reduce((s, c) => s + c.budgeted, 0)
-                const groupActivity = group.categories.reduce((s, c) => s + c.activity, 0)
-                const groupAvailable = group.categories.reduce((s, c) => s + c.available, 0)
-
-                return (
-                  <Fragment key={group.id}>
-                    {/* Gruppenzeile */}
-                    <tr className="bg-muted/30 border-t border-border">
-                      <td className="px-3 py-1.5 border border-border text-xs text-muted-foreground">{dateStr}</td>
-                      <td className="px-3 py-1.5 border border-border font-bold">{group.name}</td>
-                      <td className="px-3 py-1.5 border border-border text-right font-bold tabular-nums">
-                        {groupBudgeted !== 0
-                          ? <span className={amountColor(groupBudgeted)}>{fmt(groupBudgeted)}</span>
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-3 py-1.5 border border-border text-right font-bold tabular-nums">
-                        {groupActivity !== 0
-                          ? <span className={amountColor(groupActivity)}>{fmt(groupActivity)}</span>
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-3 py-1.5 border border-border text-right font-bold tabular-nums">
-                        {groupAvailable !== 0
-                          ? <span className={amountColor(groupAvailable)}>{fmt(groupAvailable)}</span>
-                          : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-2 py-1.5 border border-border" />
-                    </tr>
-
-                    {/* Kategoriezeilen */}
-                    {group.categories.map(cat => (
-                      <tr key={cat.id} className="border-t border-border hover:bg-muted/20">
-                        <td className="px-3 py-1.5 border border-border text-xs text-muted-foreground">{dateStr}</td>
-                        <td className="px-3 py-1.5 border border-border">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
-                            <span>{cat.name}</span>
-                            {cat.rolledOver !== 0 && (
-                              <span className={`text-xs ${cat.rolledOver > 0 ? 'text-emerald-600' : 'text-destructive'}`}>
-                                ({fmt(cat.rolledOver)})
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Betr. geplant — klickbar */}
-                        <td className="px-3 py-1.5 border border-border text-right tabular-nums">
-                          {editingCell === cat.id ? (
-                            <input
-                              ref={inputRef}
-                              type="number"
-                              step="0.01"
-                              value={editValue}
-                              onChange={e => setEditValue(e.target.value)}
-                              onBlur={() => commitEdit(cat.id)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') commitEdit(cat.id)
-                                if (e.key === 'Escape') setEditingCell(null)
-                              }}
-                              className="w-28 text-right border rounded px-2 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background"
-                            />
-                          ) : (
-                            <button
-                              onClick={() => startEdit(cat.id, cat.budgeted)}
-                              className="w-full text-right hover:bg-primary/10 rounded px-1 transition-colors"
-                              title="Klicken zum Bearbeiten"
-                            >
-                              {cat.budgeted !== 0
-                                ? <span className={amountColor(cat.budgeted)}>{fmt(cat.budgeted)}</span>
-                                : <span className="text-muted-foreground">—</span>}
-                            </button>
-                          )}
-                        </td>
-
-                        {/* Betrag (Ist) — Doppelklick öffnet Transaktionsdetails */}
-                        <td
-                          className={`px-3 py-1.5 border border-border text-right tabular-nums ${cat.activity !== 0 ? 'cursor-pointer select-none' : ''}`}
-                          onDoubleClick={() => cat.activity !== 0 && setActivityDialog({ open: true, cat })}
-                          title={cat.activity !== 0 ? 'Doppelklick für Transaktionsdetails' : undefined}
-                        >
-                          {cat.activity !== 0
-                            ? <span className={amountColor(cat.activity)}>{fmt(cat.activity)}</span>
-                            : <span className="text-muted-foreground">—</span>}
-                        </td>
-
-                        {/* Soll-Ist */}
-                        <td className="px-3 py-1.5 border border-border text-right tabular-nums">
-                          {cat.available !== 0
-                            ? <span className={amountColor(cat.available)}>{fmt(cat.available)}</span>
-                            : <span className="text-muted-foreground">—</span>}
-                        </td>
-
-                        {/* Buchen-Button */}
-                        <td className="px-1.5 py-1 border border-border text-center">
-                          {cat.budgeted !== 0 && (
-                            <button
-                              onClick={() => setBookDialog({ open: true, cat })}
-                              title="Planwert als Transaktion buchen"
-                              className="text-muted-foreground hover:text-primary transition-colors p-0.5 rounded hover:bg-primary/10"
-                            >
-                              <ArrowRightToLine className="h-3.5 w-3.5" />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </Fragment>
-                )
-              })
-            )}
-          </tbody>
+          <BudgetTableBody
+            groups={groups}
+            dateStr={dateStr}
+            openingPlan={openingPlan}
+            opening={opening}
+            budgetMonth={budgetMonth}
+            budgetYear={budgetYear}
+            editingCell={editingCell}
+            editValue={editValue}
+            inputRef={inputRef}
+            onStartEdit={startEdit}
+            onCommitEdit={commitEdit}
+            onCancelEdit={() => setEditingCell(null)}
+            onEditValueChange={setEditValue}
+            onOpenActivity={(cat) => setActivityDialog({ open: true, cat })}
+            onOpenBookDialog={(cat) => setBookDialog({ open: true, cat })}
+            onOpenConfig={() => setConfigOpen(true)}
+          />
 
           <tfoot>
-            {/* ── Einnahmen ────────────────────────────────────── */}
+            {/* Einnahmen */}
             <tr className="bg-slate-100 dark:bg-slate-800/50 font-semibold border-t-2 border-border">
               <td colSpan={2} className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Einnahmen
@@ -698,7 +281,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
               </td>
               <td className="px-3 py-1.5 border border-border" />
             </tr>
-            {/* ── Ausgaben ─────────────────────────────────────── */}
+            {/* Ausgaben */}
             <tr className="bg-slate-100 dark:bg-slate-800/50 font-semibold">
               <td colSpan={2} className="px-3 py-1.5 border border-border text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 Ausgaben
