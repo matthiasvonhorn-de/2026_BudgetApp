@@ -1,7 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
+import { ArrowLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { CategoryGroupManagerContent } from '@/components/accounts/AccountBudgetConfig'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -24,7 +27,15 @@ export default function CategoriesSettingsPage() {
   return (
     <div className="p-6 max-w-2xl space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">Kategorien & Gruppen</h1>
+        <div className="flex items-center gap-4">
+          <Link href="/settings">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Zurück
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold">Kategorien & Gruppen</h1>
+        </div>
         <p className="text-sm text-muted-foreground mt-1">
           Gruppen und Kategorien sind pro Konto konfigurierbar.
         </p>

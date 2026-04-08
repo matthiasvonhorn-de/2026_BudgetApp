@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Trash2, ToggleLeft, ToggleRight, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { RuleFormDialog } from '@/components/settings/RuleFormDialog'
@@ -55,7 +56,15 @@ export default function RulesPage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Kategorisierungsregeln</h1>
+          <div className="flex items-center gap-4">
+            <Link href="/settings">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Zurück
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold">Kategorisierungsregeln</h1>
+          </div>
           <p className="text-muted-foreground text-sm mt-1">
             Regeln werden beim CSV-Import automatisch auf Transaktionen angewendet
           </p>

@@ -1,15 +1,21 @@
 'use client'
 
 import Link from 'next/link'
-import { BookOpen, Landmark, SlidersHorizontal, Tag, TrendingDown, TrendingUp } from 'lucide-react'
+import { BookOpen, CreditCard, Landmark, SlidersHorizontal, Tag, TrendingDown, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const settingsItems = [
   {
+    href: '/settings/accounts',
+    icon: CreditCard,
+    title: 'Konten',
+    description: 'Konten anlegen, bearbeiten und Reihenfolge ändern',
+  },
+  {
     href: '/settings/general',
     icon: SlidersHorizontal,
     title: 'Allgemein',
-    description: 'Konten, Währung und Zahlenformat konfigurieren',
+    description: 'Währung und Zahlenformat konfigurieren',
   },
   {
     href: '/settings/categories',
