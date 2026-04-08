@@ -25,6 +25,12 @@ export const SEED = {
   csvProfiles: {
     deutscheBank: 'seed-csv-deutsche-bank',
   },
+  subAccounts: {
+    sparSubAccount: 'seed-sub-spar',
+  },
+  subAccountGroups: {
+    sparGroup1: 'seed-subgrp-1',
+  },
 } as const
 
 /**
@@ -154,4 +160,22 @@ export async function seedDatabase() {
       create: { key, value },
     })
   }
+
+  // --- Sub-account for Sparkonto ---
+  await prisma.subAccount.create({
+    data: {
+      id: SEED.subAccounts.sparSubAccount,
+      name: 'Spar-Unterkonto',
+      color: '#10b981',
+      accountId: SEED.accounts.sparkonto,
+    },
+  })
+
+  await prisma.subAccountGroup.create({
+    data: {
+      id: SEED.subAccountGroups.sparGroup1,
+      name: 'Rücklagen',
+      subAccountId: SEED.subAccounts.sparSubAccount,
+    },
+  })
 }
