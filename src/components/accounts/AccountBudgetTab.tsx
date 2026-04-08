@@ -41,8 +41,13 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
 
-  const saveMutation = useMutation({
-    mutationFn: async ({ categoryId, budgeted }: { categoryId: string; budgeted: number }) => {
+  const saveMutation = useMutation<
+    unknown,
+    Error,
+    { categoryId: string; budgeted: number },
+    { previous?: AccountBudgetData }
+  >({
+    mutationFn: async ({ categoryId, budgeted }) => {
       const res = await fetch(`/api/budget/${budgetYear}/${budgetMonth}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -51,11 +56,34 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
       if (!res.ok) throw new Error('Fehler')
       return res.json()
     },
-    onSuccess: () => {
+    onMutate: async ({ categoryId, budgeted }) => {
+      const queryKey = ['account-budget', accountId, budgetYear, budgetMonth] as const
+      await qc.cancelQueries({ queryKey })
+      const previous = qc.getQueryData<AccountBudgetData>(queryKey)
+      qc.setQueryData<AccountBudgetData>(queryKey, (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          groups: old.groups.map((g) => ({
+            ...g,
+            categories: g.categories.map((c) =>
+              c.id === categoryId ? { ...c, budgeted } : c
+            ),
+          })),
+        }
+      })
+      return { previous }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(['account-budget', accountId, budgetYear, budgetMonth], context.previous)
+      }
+      toast.error('Fehler beim Speichern')
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['account-budget', accountId, budgetYear, budgetMonth] })
       qc.invalidateQueries({ queryKey: ['budget', budgetYear, budgetMonth] })
     },
-    onError: () => toast.error('Fehler beim Speichern'),
   })
 
   const rolloverCheck = useMutation({

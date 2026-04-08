@@ -83,19 +83,47 @@ export default function TransactionsPage() {
     enabled: isEditMode,
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: ({ id, revertLoan }: { id: string; revertLoan: boolean }) =>
+  const deleteMutation = useMutation<
+    unknown,
+    Error,
+    { id: string; revertLoan: boolean },
+    { queryKeys: [readonly unknown[], TransactionPage | undefined][] }
+  >({
+    mutationFn: ({ id, revertLoan }) =>
       fetch(`/api/transactions/${id}?revertLoan=${revertLoan}`, { method: 'DELETE' }).then(r => r.json()),
+    onMutate: async ({ id }) => {
+      await queryClient.cancelQueries({ queryKey: ['transactions'] })
+      const queryKeys = queryClient.getQueriesData<TransactionPage>({ queryKey: ['transactions'] })
+      queryClient.setQueriesData<TransactionPage>({ queryKey: ['transactions'] }, (old) => {
+        if (!old?.data) return old
+        return {
+          ...old,
+          data: old.data.filter((t) => t.id !== id),
+          total: old.total - 1,
+        }
+      })
+      return { queryKeys }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.queryKeys) {
+        for (const [key, data] of context.queryKeys) {
+          queryClient.setQueryData(key, data)
+        }
+      }
+      toast.error('Fehler beim Löschen')
+    },
     onSuccess: (_, { revertLoan }) => {
+      if (revertLoan) queryClient.invalidateQueries({ queryKey: ['loans'] })
+      setPendingDelete(null)
+      toast.success('Transaktion gelöscht')
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] })
       queryClient.invalidateQueries({ queryKey: ['account-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['sub-accounts'] })
       queryClient.invalidateQueries({ queryKey: ['account-budget'] })
       queryClient.invalidateQueries({ queryKey: ['budget'] })
-      if (revertLoan) queryClient.invalidateQueries({ queryKey: ['loans'] })
-      setPendingDelete(null)
-      toast.success('Transaktion gelöscht')
     },
   })
 
