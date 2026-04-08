@@ -178,4 +178,5 @@ export async function seedDatabase() {
       subAccountId: SEED.subAccounts.sparSubAccount,
     },
   })
+
 }
