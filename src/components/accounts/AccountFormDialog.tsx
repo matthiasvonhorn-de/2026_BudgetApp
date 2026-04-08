@@ -124,13 +124,12 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
     enabled: open && isEdit && isSavingsType(account?.type),
   })
 
-  const isSavings = isSavingsType(form.type)
-
   // Load accounts for linked account dropdown
+  // Use userEdits/account type directly since `form` isn't defined yet
   const { data: allAccounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
-    enabled: open && isSavings,
+    enabled: open && isSavingsType(userEdits.type ?? account?.type),
   })
 
   const giroAccounts = allAccounts.filter(a => !isSavingsType(a.type) && a.isActive)
@@ -175,9 +174,12 @@ export function AccountFormDialog({ open, onOpenChange, account }: Props) {
   // Merge server template with user edits — user edits take precedence
   const form = useMemo<FormState>(() => ({ ...serverTemplate, ...userEdits }), [serverTemplate, userEdits])
 
-  // Keep date init refs in sync with form template (updated during render — safe for refs)
-  startDateInitRef.current = form.startDate
+  // Keep date init refs in sync with form template
+  useEffect(() => {
+    startDateInitRef.current = form.startDate
+  }, [form.startDate])
 
+  const isSavings = isSavingsType(form.type)
   const isSparplan = form.type === 'SPARPLAN'
 
   // Load categories for linked account
