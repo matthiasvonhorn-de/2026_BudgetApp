@@ -98,11 +98,11 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <span className="text-muted-foreground">—</span>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevMonth}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPrevMonth} aria-label="Vorheriger Monat">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-sm text-muted-foreground w-36 text-center">{getMonthName(budgetMonth, budgetYear)}</span>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNextMonth}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToNextMonth} aria-label="Nächster Monat">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

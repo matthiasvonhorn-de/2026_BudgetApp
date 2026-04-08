@@ -173,7 +173,7 @@ export default function TransactionsPage() {
             value={String(pageSize)}
             onValueChange={v => { setPageSize(Number(v)); setPage(1) }}
           >
-            <SelectTrigger className="w-[100px]">
+            <SelectTrigger className="w-[100px]" aria-label="Einträge pro Seite">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -215,6 +215,7 @@ export default function TransactionsPage() {
                       className="h-7 px-2"
                       onClick={() => { setIsEditMode(false); setEditingRows({}) }}
                       disabled={isSaving}
+                      aria-label="Abbrechen"
                     >
                       <X className="h-3.5 w-3.5" />
                     </Button>
@@ -225,6 +226,7 @@ export default function TransactionsPage() {
                     size="sm"
                     className="text-muted-foreground hover:text-foreground h-7 px-2"
                     onClick={() => setIsEditMode(true)}
+                    aria-label="Bearbeiten"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -333,6 +335,7 @@ export default function TransactionsPage() {
                         size="sm"
                         className="text-muted-foreground hover:text-foreground h-7 px-2"
                         onClick={() => setEditingTransaction(t)}
+                        aria-label="Transaktion bearbeiten"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -342,6 +345,7 @@ export default function TransactionsPage() {
                         className="text-muted-foreground hover:text-destructive h-7 px-2"
                         onClick={() => handleDeleteClick(t)}
                         disabled={deleteMutation.isPending}
+                        aria-label="Transaktion löschen"
                       >
                         ×
                       </Button>
