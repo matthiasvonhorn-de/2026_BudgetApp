@@ -1,5 +1,8 @@
 import { roundCents } from '@/lib/money'
 
+/** Threshold below which a loan balance is considered fully repaid (handles floating-point rounding) */
+const BALANCE_EPSILON = 0.005
+
 export interface LoanParams {
   loanType: 'ANNUITAETENDARLEHEN' | 'RATENKREDIT'
   principal: number
@@ -50,7 +53,7 @@ export function generateSchedule(
   let balance = fromBalance
 
   for (let i = 0; i < limit; i++) {
-    if (params.loanType === 'RATENKREDIT' && balance <= 0.005) break
+    if (params.loanType === 'RATENKREDIT' && balance <= BALANCE_EPSILON) break
 
     const period = fromPeriod + i
     const interest = balance * r
@@ -58,7 +61,7 @@ export function generateSchedule(
 
     if (params.loanType === 'ANNUITAETENDARLEHEN') {
       // Letzter Monat oder frühere Vollrückzahlung durch Sondertilgung
-      if (balance <= 0.005) break
+      if (balance <= BALANCE_EPSILON) break
       principal = Math.min(annuity - interest, balance)
     } else {
       principal = Math.min(fixedPrincipal, balance)
