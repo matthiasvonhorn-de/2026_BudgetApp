@@ -75,6 +75,54 @@ export const PUT = withHandler(async (request: Request, ctx) => {
         })
       }
 
+      // Sync paired TRANSFER transaction (Sub-Only transfers have a paired TX)
+      let pairedId = existing.transferToId
+      if (!pairedId) {
+        const reverseRef = await tx.transaction.findFirst({
+          where: { transferToId: id },
+          select: { id: true },
+        })
+        pairedId = reverseRef?.id ?? null
+      }
+      if (pairedId) {
+        const paired = await tx.transaction.findUnique({ where: { id: pairedId } })
+        if (paired) {
+          const newPairedSub = -newSubAmount
+          const newPairedSubType = newPairedSub >= 0 ? 'INCOME' : 'EXPENSE'
+          const pairedSubDiff = newPairedSub - (paired.subAmount ?? 0)
+
+          await tx.transaction.update({
+            where: { id: pairedId },
+            data: {
+              ...(data.date && { date: newDate }),
+              ...(data.description && { description: newDescription }),
+              subAmount: newPairedSub,
+              subType: newPairedSubType,
+            },
+          })
+
+          // Sync paired subAccountEntry
+          if (paired.subAccountEntryId) {
+            await tx.subAccountEntry.update({
+              where: { id: paired.subAccountEntryId },
+              data: {
+                amount: newPairedSub,
+                ...(data.date && { date: newDate }),
+                ...(data.description && { description: newDescription }),
+              },
+            })
+          }
+
+          // Update paired account balance
+          if (pairedSubDiff !== 0) {
+            await tx.account.update({
+              where: { id: paired.accountId },
+              data: { currentBalance: balanceIncrement(pairedSubDiff) },
+            })
+          }
+        }
+      }
+
       return updated
     }
 
