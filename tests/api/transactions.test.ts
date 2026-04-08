@@ -245,6 +245,136 @@ describe('PUT /api/transactions/[id]', () => {
   })
 })
 
+describe('PUT /api/transactions/[id] — Sub-Only transfer sync', () => {
+  it('syncs paired transaction when editing a Sub-Only transfer', async () => {
+    // Create Sub-Only transfer pair: source on giro, target on spar
+    const sourceTx = await prisma.transaction.create({
+      data: {
+        date: new Date('2026-04-01'),
+        mainAmount: null,
+        mainType: 'TRANSFER',
+        subAmount: -200,
+        subType: 'EXPENSE',
+        description: 'Transfer test',
+        accountId: SEED.accounts.girokonto,
+        status: 'CLEARED',
+      },
+    })
+    const targetTx = await prisma.transaction.create({
+      data: {
+        date: new Date('2026-04-01'),
+        mainAmount: null,
+        mainType: 'TRANSFER',
+        subAmount: 200,
+        subType: 'INCOME',
+        description: 'Transfer test',
+        accountId: SEED.accounts.sparkonto,
+        status: 'CLEARED',
+      },
+    })
+    // Link source → target
+    await prisma.transaction.update({
+      where: { id: sourceTx.id },
+      data: { transferToId: targetTx.id },
+    })
+    // Adjust balances for the initial transfer
+    await prisma.account.update({
+      where: { id: SEED.accounts.girokonto },
+      data: { currentBalance: 800 }, // 1000 - 200
+    })
+    await prisma.account.update({
+      where: { id: SEED.accounts.sparkonto },
+      data: { currentBalance: 5200 }, // 5000 + 200
+    })
+
+    // Edit source TX: change amount from -200 to -300
+    const res = await PUT(
+      createRequest('PUT', `/api/transactions/${sourceTx.id}`, {
+        subAmount: -300,
+      }),
+      createParams({ id: sourceTx.id }),
+    )
+    expect(res.status).toBe(200)
+
+    // Source TX should have -300
+    const updatedSource = await prisma.transaction.findUnique({ where: { id: sourceTx.id } })
+    expect(updatedSource!.subAmount).toBe(-300)
+
+    // Target TX should be synced to +300
+    const updatedTarget = await prisma.transaction.findUnique({ where: { id: targetTx.id } })
+    expect(updatedTarget!.subAmount).toBe(300)
+
+    // Balances: giro went from 800 to 700 (-100 diff), spar from 5200 to 5300 (+100 diff)
+    const giro = await prisma.account.findUnique({ where: { id: SEED.accounts.girokonto } })
+    expect(giro!.currentBalance).toBe(700)
+    const spar = await prisma.account.findUnique({ where: { id: SEED.accounts.sparkonto } })
+    expect(spar!.currentBalance).toBe(5300)
+  })
+
+  it('syncs via reverse lookup when editing the target side', async () => {
+    // Create pair: source → target
+    const sourceTx = await prisma.transaction.create({
+      data: {
+        date: new Date('2026-04-01'),
+        mainAmount: null,
+        mainType: 'TRANSFER',
+        subAmount: -150,
+        subType: 'EXPENSE',
+        description: 'Reverse test',
+        accountId: SEED.accounts.girokonto,
+        status: 'CLEARED',
+      },
+    })
+    const targetTx = await prisma.transaction.create({
+      data: {
+        date: new Date('2026-04-01'),
+        mainAmount: null,
+        mainType: 'TRANSFER',
+        subAmount: 150,
+        subType: 'INCOME',
+        description: 'Reverse test',
+        accountId: SEED.accounts.sparkonto,
+        status: 'CLEARED',
+      },
+    })
+    await prisma.transaction.update({
+      where: { id: sourceTx.id },
+      data: { transferToId: targetTx.id },
+    })
+    await prisma.account.update({
+      where: { id: SEED.accounts.girokonto },
+      data: { currentBalance: 850 },
+    })
+    await prisma.account.update({
+      where: { id: SEED.accounts.sparkonto },
+      data: { currentBalance: 5150 },
+    })
+
+    // Edit TARGET TX (has no transferToId, needs reverse lookup)
+    const res = await PUT(
+      createRequest('PUT', `/api/transactions/${targetTx.id}`, {
+        subAmount: 250,
+      }),
+      createParams({ id: targetTx.id }),
+    )
+    expect(res.status).toBe(200)
+
+    // Target should be 250
+    const updatedTarget = await prisma.transaction.findUnique({ where: { id: targetTx.id } })
+    expect(updatedTarget!.subAmount).toBe(250)
+
+    // Source should be synced to -250
+    const updatedSource = await prisma.transaction.findUnique({ where: { id: sourceTx.id } })
+    expect(updatedSource!.subAmount).toBe(-250)
+
+    // Balances: spar from 5150 to 5250 (+100), giro from 850 to 750 (-100)
+    const spar = await prisma.account.findUnique({ where: { id: SEED.accounts.sparkonto } })
+    expect(spar!.currentBalance).toBe(5250)
+    const giro = await prisma.account.findUnique({ where: { id: SEED.accounts.girokonto } })
+    expect(giro!.currentBalance).toBe(750)
+  })
+})
+
 describe('DELETE /api/transactions/[id]', () => {
   it('deletes transaction and reverses balance', async () => {
     // Create via POST
