@@ -50,18 +50,12 @@ export default function PortfoliosPage() {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Aktiendepots</h1>
         <Button size="sm" onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-1" /> Neues Depot
         </Button>
       </div>
-
-      {portfolios.length > 0 && (
-        <p className="text-muted-foreground text-sm mb-6">
-          Gesamtwert: <span className="font-semibold text-foreground">{fmt(totalValue)}</span>
-        </p>
-      )}
 
       {portfolios.length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-64 text-center">
@@ -75,6 +69,13 @@ export default function PortfoliosPage() {
           </Button>
         </div>
       ) : (
+        <>
+        <div className="rounded-xl border bg-card p-5 mb-6">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Gesamtwert</p>
+            <p className="text-3xl font-bold">{fmt(totalValue)}</p>
+          </div>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {portfolios.map((portfolio) => (
             <Link key={portfolio.id} href={`/portfolios/${portfolio.id}`}>
@@ -118,6 +119,7 @@ export default function PortfoliosPage() {
             </Link>
           ))}
         </div>
+        </>
       )}
 
       <PortfolioDialog key={`portfolio-new-${dialogOpen ? 'open' : 'closed'}`} open={dialogOpen} onOpenChange={setDialogOpen} />

@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
-import { ArrowLeft, Plus, Pencil } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Search } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/pagination'
 import { ACCOUNT_TYPE_LABELS, formatDate } from '@/lib/utils'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ReconcileDialog } from '@/components/accounts/ReconcileDialog'
 import { SubAccountsSection } from '@/components/accounts/SubAccountsSection'
 import { AccountBudgetTab } from '@/components/accounts/AccountBudgetTab'
@@ -48,9 +48,16 @@ export default function AccountDetailPage() {
   const [tab, setTab] = useState<Tab>('Transaktionen')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(100)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const queryClient = useQueryClient()
 
   const fmt = useFormatCurrency()
+
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 300)
+    return () => clearTimeout(t)
+  }, [search])
 
   const deleteMutation = useMutation<
     unknown,
@@ -99,9 +106,10 @@ export default function AccountDetailPage() {
   })
 
   const { data: txResult, isPlaceholderData } = useQuery({
-    queryKey: ['account-transactions', id, page, pageSize],
+    queryKey: ['account-transactions', id, debouncedSearch, page, pageSize],
     queryFn: () => {
       const params = new URLSearchParams({ accountId: id as string, page: String(page), pageSize: String(pageSize) })
+      if (debouncedSearch) params.set('search', debouncedSearch)
       return fetch(`/api/transactions?${params}`).then(r => r.json())
     },
     placeholderData: (prev) => prev,
@@ -176,6 +184,16 @@ export default function AccountDetailPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">Transaktionen</h2>
             <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Suchen..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="h-9 w-48 rounded-md border border-input bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Pro Seite:</span>
                 <Select

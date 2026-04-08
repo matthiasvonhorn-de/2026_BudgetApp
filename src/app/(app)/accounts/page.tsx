@@ -25,13 +25,8 @@ export default function AccountsPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Konten</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Gesamtvermögen: <span className="font-semibold text-foreground">{fmt(totalBalance)}</span>
-          </p>
-        </div>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Konten</h1>
         <div className="flex items-center gap-2">
         {!isLoading && accounts.length > 1 && (
           isReordering ? (
@@ -51,6 +46,15 @@ export default function AccountsPage() {
         )}
         </div>
       </div>
+
+      {!isLoading && accounts.length > 0 && (
+        <div className="rounded-xl border bg-card p-5 mb-6">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Gesamtvermögen</p>
+            <p className={`text-3xl font-bold ${totalBalance < 0 ? 'text-destructive' : ''}`}>{fmt(totalBalance)}</p>
+          </div>
+        </div>
+      )}
 
       {isError ? (
         <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>

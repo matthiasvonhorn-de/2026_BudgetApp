@@ -58,6 +58,23 @@ export default function LoansPage() {
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Bankkredite</h1>
 
+      <div className="rounded-xl border bg-card p-5 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground mb-1">Gesamtrestschuld</p>
+            <p className="text-3xl font-bold text-destructive">
+              {fmt(loans.reduce((sum: number, l: Loan) => sum + (l.stats?.currentBalance ?? 0), 0))}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground mb-1">Zinsen bezahlt (gesamt)</p>
+            <p className="text-lg font-semibold text-destructive">
+              {fmt(loans.reduce((sum: number, l: Loan) => sum + (l.stats?.totalInterestPaid ?? 0), 0))}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {loans.map((loan: Loan) => {
           const stats = loan.stats!
