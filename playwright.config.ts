@@ -9,6 +9,7 @@ export default defineConfig({
     'accounts/**/*.spec.ts',
     'transactions/**/*.spec.ts',
     'budget/**/*.spec.ts',
+    'settings/**/*.spec.ts',
   ],
   timeout: 30_000,
   retries: 0,
