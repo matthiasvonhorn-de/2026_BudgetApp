@@ -271,12 +271,14 @@ export default function LoanDetailPage() {
                           variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0"
                           onClick={() => saveExtra(p.periodNumber)}
                           disabled={paymentMutation.isPending}
+                          aria-label="Speichern"
                         >
                           <Check className="h-3.5 w-3.5 text-emerald-600" />
                         </Button>
                         <Button
                           variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0"
                           onClick={() => setEditState(null)}
+                          aria-label="Abbrechen"
                         >
                           <X className="h-3.5 w-3.5 text-destructive" />
                         </Button>

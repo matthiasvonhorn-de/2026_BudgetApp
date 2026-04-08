@@ -48,7 +48,7 @@ export default function BudgetPage() {
   const [editValue, setEditValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const { data, isLoading } = useQuery<BudgetData>({
+  const { data, isLoading, isError } = useQuery<BudgetData>({
     queryKey: ['budget', budgetYear, budgetMonth],
     queryFn: () => fetch(`/api/budget/${budgetYear}/${budgetMonth}`).then(r => r.json()),
   })
@@ -121,6 +121,10 @@ export default function BudgetPage() {
     setEditingCell(null)
   }
 
+  if (isError) {
+    return <div className="p-6 text-sm text-destructive">Fehler beim Laden der Budgetdaten</div>
+  }
+
   if (isLoading) {
     return (
       <div className="p-6">
@@ -140,13 +144,13 @@ export default function BudgetPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={goToPrevMonth}>
+          <Button variant="ghost" size="icon" onClick={goToPrevMonth} aria-label="Vorheriger Monat">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-bold w-52 text-center">
             {getMonthName(budgetMonth, budgetYear)}
           </h1>
-          <Button variant="ghost" size="icon" onClick={goToNextMonth}>
+          <Button variant="ghost" size="icon" onClick={goToNextMonth} aria-label="Nächster Monat">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
