@@ -1,16 +1,20 @@
 import { test, expect } from '@playwright/test'
 
 test.describe('Settings navigation', () => {
-  test('settings page shows all sub-pages as cards', async ({ page }) => {
+  test('settings page shows two sections with all cards', async ({ page }) => {
     await page.goto('/settings')
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByRole('heading', { name: 'Einstellungen' })).toBeVisible()
-    // Check cards by their descriptions (unique to settings page, avoids sidebar link conflicts)
-    await expect(page.getByText('Konten anlegen, bearbeiten und Reihenfolge ändern')).toBeVisible()
-    await expect(page.getByText('Währung und Zahlenformat konfigurieren')).toBeVisible()
+
+    // General section (no heading, cards directly)
+    await expect(page.getByText('Währung, Zahlenformat und Darstellung')).toBeVisible()
     await expect(page.getByText('Kategoriegruppen und Kategorien verwalten')).toBeVisible()
     await expect(page.getByText('Automatische Regeln für den CSV-Import')).toBeVisible()
+
+    // Asset configuration section
+    await expect(page.getByText('Konfiguration der Assettypen')).toBeVisible()
+    await expect(page.getByText('Konten anlegen, bearbeiten und Reihenfolge ändern')).toBeVisible()
     await expect(page.getByText('Ratenkredite und Annuitätendarlehen')).toBeVisible()
     await expect(page.getByText('Depots anlegen und verwalten')).toBeVisible()
     await expect(page.getByText('Typen für Sachwerte verwalten')).toBeVisible()
@@ -29,13 +33,26 @@ test.describe('Settings navigation', () => {
     await expect(page.getByRole('heading', { name: 'Einstellungen' })).toBeVisible()
   })
 
-  test('general settings page has back button and shows currency', async ({ page }) => {
+  test('general settings page has theme picker and currency', async ({ page }) => {
     await page.goto('/settings/general')
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByRole('heading', { name: 'Allgemein' })).toBeVisible()
     await expect(page.getByText('Zurück')).toBeVisible()
+    await expect(page.getByText('Darstellung')).toBeVisible()
+    await expect(page.getByText('Helles Design')).toBeVisible()
+    await expect(page.getByText('Dunkles Design')).toBeVisible()
+    await expect(page.getByText('Systemeinstellung')).toBeVisible()
     await expect(page.getByText('Währung & Zahlenformat')).toBeVisible()
+  })
+
+  test('sidebar does not have dark mode toggle', async ({ page }) => {
+    await page.goto('/settings')
+    await page.waitForLoadState('networkidle')
+
+    const sidebar = page.locator('aside')
+    await expect(sidebar.getByText('Helles Design')).not.toBeVisible()
+    await expect(sidebar.getByText('Dunkles Design')).not.toBeVisible()
   })
 
   test('all settings sub-pages have back button', async ({ page }) => {
