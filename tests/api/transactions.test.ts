@@ -89,6 +89,21 @@ describe('GET /api/transactions', () => {
     expect(body.data[0].description).toBe('EDEKA Berlin')
   })
 
+  it('searches within a specific account', async () => {
+    await prisma.transaction.createMany({
+      data: [
+        { date: new Date('2026-04-01'), mainAmount: -10, mainType: 'EXPENSE', description: 'Rewe Einkauf', accountId: SEED.accounts.girokonto, status: 'PENDING' },
+        { date: new Date('2026-04-01'), mainAmount: -20, mainType: 'EXPENSE', description: 'Rewe Einkauf', accountId: SEED.accounts.sparkonto, status: 'PENDING' },
+        { date: new Date('2026-04-01'), mainAmount: -30, mainType: 'EXPENSE', description: 'Aldi Einkauf', accountId: SEED.accounts.girokonto, status: 'PENDING' },
+      ],
+    })
+    const res = await GET(createRequest('GET', `/api/transactions?accountId=${SEED.accounts.girokonto}&search=Rewe`))
+    const body = await res.json()
+    expect(body.data).toHaveLength(1)
+    expect(body.data[0].description).toBe('Rewe Einkauf')
+    expect(body.data[0].accountId).toBe(SEED.accounts.girokonto)
+  })
+
   it('paginates results', async () => {
     for (let i = 0; i < 5; i++) {
       await prisma.transaction.create({
