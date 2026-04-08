@@ -20,7 +20,7 @@ export default function PortfoliosSettingsPage() {
   const openEdit = (p: PortfolioListItem) => { setEditPortfolio(p); setDialogOpen(true) }
   const closeDialog = () => { setDialogOpen(false); setEditPortfolio(null) }
 
-  const { data: portfolios = [], isLoading } = useQuery<PortfolioListItem[]>({
+  const { data: portfolios = [], isLoading, isError } = useQuery<PortfolioListItem[]>({
     queryKey: ['portfolios'],
     queryFn: () => fetch('/api/portfolios').then(r => r.json()),
   })
@@ -53,7 +53,9 @@ export default function PortfoliosSettingsPage() {
         </Button>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      ) : isLoading ? (
         <p className="text-muted-foreground">Laden...</p>
       ) : portfolios.length === 0 ? (
         <div className="rounded-lg border p-8 text-center text-muted-foreground">

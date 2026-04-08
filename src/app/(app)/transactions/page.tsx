@@ -61,7 +61,7 @@ export default function TransactionsPage() {
     return () => clearTimeout(t)
   }, [search])
 
-  const { data: result, isLoading, isPlaceholderData } = useQuery<TransactionPage>({
+  const { data: result, isLoading, isPlaceholderData, isError } = useQuery<TransactionPage>({
     queryKey: ['transactions', debouncedSearch, page, pageSize],
     queryFn: () => {
       const params = new URLSearchParams()
@@ -233,7 +233,9 @@ export default function TransactionsPage() {
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
+            {isError ? (
+              <tr><td colSpan={6} className="p-8 text-center text-destructive text-sm">Fehler beim Laden der Daten</td></tr>
+            ) : isLoading ? (
               <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Laden...</td></tr>
             ) : transactions.length === 0 ? (
               <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">Keine Transaktionen gefunden</td></tr>

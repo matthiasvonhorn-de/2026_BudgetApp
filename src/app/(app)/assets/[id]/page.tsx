@@ -59,7 +59,7 @@ export default function AssetDetailPage() {
   const [editRow, setEditRow] = useState<EditRowState | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
 
-  const { data: asset, isLoading } = useQuery<AssetDetail>({
+  const { data: asset, isLoading, isError } = useQuery<AssetDetail>({
     queryKey: ['assets', id],
     queryFn: () => fetch(`/api/assets/${id}`).then(r => r.json()),
   })
@@ -112,6 +112,14 @@ export default function AssetDetailPage() {
     },
     onError: () => toast.error('Fehler beim Löschen'),
   })
+
+  if (isError) {
+    return (
+      <div className="p-6">
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      </div>
+    )
+  }
 
   if (isLoading || !asset) {
     return (

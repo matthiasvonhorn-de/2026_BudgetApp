@@ -28,7 +28,7 @@ export default function RulesPage() {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data: rules = [], isLoading } = useQuery({
+  const { data: rules = [], isLoading, isError } = useQuery({
     queryKey: ['rules'],
     queryFn: () => fetch('/api/rules').then(r => r.json()),
   })
@@ -66,7 +66,9 @@ export default function RulesPage() {
         </Button>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      ) : isLoading ? (
         <div className="space-y-2">
           {[...Array(3)].map((_, i) => <div key={i} className="h-14 bg-muted rounded animate-pulse" />)}
         </div>

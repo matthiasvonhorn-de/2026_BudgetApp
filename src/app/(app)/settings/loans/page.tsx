@@ -101,13 +101,13 @@ function LoanDialog({
     node.addEventListener('blur', handler)
   }, [])
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [], isError: isErrorAccounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
     enabled: open,
   })
 
-  const { data: accountCategories = [] } = useQuery<{ id: string; name: string; categories: { id: string; name: string; color: string }[] }[]>({
+  const { data: accountCategories = [], isError: isErrorCategories } = useQuery<{ id: string; name: string; categories: { id: string; name: string; color: string }[] }[]>({
     queryKey: ['account-category-groups', form.accountId],
     queryFn: () => fetch(`/api/accounts/${form.accountId}/category-groups`).then(r => r.json()),
     enabled: open && !!form.accountId,
@@ -186,6 +186,9 @@ function LoanDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-1">
+          {(isErrorAccounts || isErrorCategories) && (
+            <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2 space-y-1.5">
               <Label>Name *</Label>
@@ -367,7 +370,7 @@ export default function LoansSettingsPage() {
   const openCreate = () => { setEditLoan(undefined); setDialogOpen(true) }
   const closeDialog = () => { setDialogOpen(false); setEditLoan(undefined) }
 
-  const { data: loans = [], isLoading } = useQuery({
+  const { data: loans = [], isLoading, isError } = useQuery({
     queryKey: ['loans'],
     queryFn: () => fetch('/api/loans').then(r => r.json()),
   })
@@ -398,7 +401,9 @@ export default function LoansSettingsPage() {
         </Button>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      ) : isLoading ? (
         <p className="text-muted-foreground">Laden...</p>
       ) : loans.length === 0 ? (
         <div className="rounded-lg border p-8 text-center text-muted-foreground">

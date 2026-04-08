@@ -137,13 +137,13 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
       {/* Monat-Navigation */}
       <div className="flex items-center justify-between px-4 py-2 border-b bg-card">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPrevMonth}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToPrevMonth} aria-label="Vorheriger Monat">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="font-semibold text-sm w-44 text-center">
             {getMonthName(budgetMonth, budgetYear)}
           </span>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={goToNextMonth} aria-label="Nächster Monat">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -154,6 +154,7 @@ export function AccountBudgetTab({ accountId }: { accountId: string }) {
             className="h-7 w-7"
             onClick={() => setConfigOpen(true)}
             title="Kategoriegruppen konfigurieren"
+            aria-label="Kategoriegruppen konfigurieren"
           >
             <Settings2 className="h-4 w-4" />
           </Button>

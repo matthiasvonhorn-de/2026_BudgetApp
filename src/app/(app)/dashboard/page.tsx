@@ -50,32 +50,32 @@ export default function DashboardPage() {
   const fmtCompact = (v: number) => new Intl.NumberFormat(locale, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(v)
   const { budgetYear, budgetMonth, goToPrevMonth, goToNextMonth } = useUIStore()
 
-  const { data: accounts = [] } = useQuery<Account[]>({
+  const { data: accounts = [], isError: isErrorAccounts } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
 
-  const { data: netWorth } = useQuery<NetWorth>({
+  const { data: netWorth, isError: isErrorNetWorth } = useQuery<NetWorth>({
     queryKey: ['net-worth', budgetYear, budgetMonth],
     queryFn: () => fetch(`/api/reports/net-worth?year=${budgetYear}&month=${budgetMonth}`).then(r => r.json()),
   })
 
-  const { data: budgetData } = useQuery<BudgetData>({
+  const { data: budgetData, isError: isErrorBudget } = useQuery<BudgetData>({
     queryKey: ['budget', budgetYear, budgetMonth],
     queryFn: () => fetch(`/api/budget/${budgetYear}/${budgetMonth}`).then(r => r.json()),
   })
 
-  const { data: transactions = [] } = useQuery<Transaction[]>({
+  const { data: transactions = [], isError: isErrorTransactions } = useQuery<Transaction[]>({
     queryKey: ['transactions-recent'],
     queryFn: () => fetch('/api/transactions?pageSize=5').then(r => r.json().then(r => r.data)),
   })
 
-  const { data: monthlySummary = [] } = useQuery<MonthlySummary[]>({
+  const { data: monthlySummary = [], isError: isErrorMonthlySummary } = useQuery<MonthlySummary[]>({
     queryKey: ['reports-monthly-summary-6'],
     queryFn: () => fetch('/api/reports/monthly-summary?months=6').then(r => r.json()),
   })
 
-  const { data: groupSpendingData } = useQuery<GroupSpendingData>({
+  const { data: groupSpendingData, isError: isErrorGroupSpending } = useQuery<GroupSpendingData>({
     queryKey: ['reports-group-spending', budgetYear, budgetMonth],
     queryFn: () => fetch(`/api/reports/category-spending?year=${budgetYear}&month=${budgetMonth}`).then(r => r.json()),
   })
@@ -110,26 +110,40 @@ export default function DashboardPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Wallet className="h-4 w-4" /> Gesamtvermögen
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-2xl font-bold ${(netWorth?.netWorth ?? 0) < 0 ? 'text-destructive' : ''}`}>
-              {fmt(netWorth?.netWorth ?? 0)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Konten {fmt(netWorth?.totalAssets ?? 0)}
-              {(netWorth?.totalPortfolios ?? 0) > 0 && <> · Depots {fmt(netWorth?.totalPortfolios ?? 0)}</>}
-              {(netWorth?.totalRealAssets ?? 0) > 0 && <> · Sachwerte {fmt(netWorth?.totalRealAssets ?? 0)}</>}
-              {(netWorth?.totalDebts ?? 0) > 0 && <> · Schulden −{fmt(netWorth?.totalDebts ?? 0)}</>}
-            </p>
-          </CardContent>
-        </Card>
+        {isErrorNetWorth ? (
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-sm text-destructive">Fehler beim Laden des Nettovermögens</div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Wallet className="h-4 w-4" /> Gesamtvermögen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className={`text-2xl font-bold ${(netWorth?.netWorth ?? 0) < 0 ? 'text-destructive' : ''}`}>
+                {fmt(netWorth?.netWorth ?? 0)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Konten {fmt(netWorth?.totalAssets ?? 0)}
+                {(netWorth?.totalPortfolios ?? 0) > 0 && <> · Depots {fmt(netWorth?.totalPortfolios ?? 0)}</>}
+                {(netWorth?.totalRealAssets ?? 0) > 0 && <> · Sachwerte {fmt(netWorth?.totalRealAssets ?? 0)}</>}
+                {(netWorth?.totalDebts ?? 0) > 0 && <> · Schulden −{fmt(netWorth?.totalDebts ?? 0)}</>}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
-        {summary && (
+        {isErrorBudget ? (
+          <Card>
+            <CardContent className="p-4">
+              <div className="text-sm text-destructive">Fehler beim Laden der Budgetdaten</div>
+            </CardContent>
+          </Card>
+        ) : summary && (
           <>
             <Card>
               <CardHeader className="pb-2">
@@ -173,7 +187,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts Row */}
-      {chartData.length > 0 && (
+      {isErrorMonthlySummary ? (
+        <div className="text-sm text-destructive p-4 mb-6">Fehler beim Laden der Monatsübersicht</div>
+      ) : chartData.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <Card>
             <CardHeader>
@@ -194,7 +210,13 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {topGroups.length > 0 ? (
+          {isErrorGroupSpending ? (
+            <Card>
+              <CardContent className="flex items-center justify-center h-[200px]">
+                <div className="text-sm text-destructive">Fehler beim Laden der Gruppenausgaben</div>
+              </CardContent>
+            </Card>
+          ) : topGroups.length > 0 ? (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Ausgaben nach Gruppe</CardTitle>
@@ -242,7 +264,9 @@ export default function DashboardPage() {
             <CardTitle className="text-base">Konten</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {accounts.length === 0 ? (
+            {isErrorAccounts ? (
+              <div className="text-sm text-destructive p-4">Fehler beim Laden der Konten</div>
+            ) : accounts.length === 0 ? (
               <p className="text-sm text-muted-foreground">Keine Konten angelegt</p>
             ) : accounts.map((a) => (
               <div key={a.id} className="flex items-center justify-between py-1">
@@ -263,7 +287,9 @@ export default function DashboardPage() {
             <CardTitle className="text-base">Letzte Transaktionen</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {transactions.length === 0 ? (
+            {isErrorTransactions ? (
+              <div className="text-sm text-destructive p-4">Fehler beim Laden der Transaktionen</div>
+            ) : transactions.length === 0 ? (
               <p className="text-sm text-muted-foreground">Keine Transaktionen</p>
             ) : transactions.map((t) => (
               <div key={t.id} className="flex items-center justify-between py-1">

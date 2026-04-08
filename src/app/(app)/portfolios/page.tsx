@@ -17,12 +17,20 @@ export default function PortfoliosPage() {
   const fmt = useFormatCurrency()
   const [dialogOpen, setDialogOpen] = useState(false)
 
-  const { data: portfolios = [], isLoading } = useQuery<PortfolioListItem[]>({
+  const { data: portfolios = [], isLoading, isError } = useQuery<PortfolioListItem[]>({
     queryKey: ['portfolios'],
     queryFn: () => fetch('/api/portfolios').then(r => r.json()),
   })
 
   const totalValue = portfolios.reduce((sum, p) => sum + (p.currentValue ?? 0), 0)
+
+  if (isError) {
+    return (
+      <div className="p-6">
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

@@ -85,10 +85,10 @@ function NewEntryRow({ groupId, accountId, categoryId, onDone }: { groupId: stri
       </td>
       <td className="px-2 py-1">
         <div className="flex gap-1">
-          <Button size="sm" variant="default" disabled={!valid} onClick={() => mutation.mutate()}>
+          <Button size="sm" variant="default" disabled={!valid} onClick={() => mutation.mutate()} aria-label="Speichern">
             <Check className="h-3 w-3" />
           </Button>
-          <Button size="sm" variant="ghost" onClick={onDone}>
+          <Button size="sm" variant="ghost" onClick={onDone} aria-label="Abbrechen">
             <X className="h-3 w-3" />
           </Button>
         </div>
@@ -186,15 +186,15 @@ function GroupSection({
                   className="border rounded px-1 py-0.5 text-sm w-24 text-right"
                 />
               </label>
-              <button onClick={saveEdit} className="text-emerald-600 hover:text-emerald-700"><Check className="h-3.5 w-3.5" /></button>
-              <button onClick={() => setEditing(false)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+              <button onClick={saveEdit} className="text-emerald-600 hover:text-emerald-700" aria-label="Speichern"><Check className="h-3.5 w-3.5" /></button>
+              <button onClick={() => setEditing(false)} className="text-muted-foreground hover:text-foreground" aria-label="Abbrechen"><X className="h-3.5 w-3.5" /></button>
             </div>
           </td>
         ) : (
           <>
             <td colSpan={4} className="px-2 py-1">
               <div className="flex items-center gap-2">
-                <button onClick={() => setExpanded(v => !v)} className="text-muted-foreground">
+                <button onClick={() => setExpanded(v => !v)} className="text-muted-foreground" aria-label="Gruppe ein-/ausklappen">
                   {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                 </button>
                 <span className="font-semibold text-sm">{group.name}</span>
@@ -208,12 +208,13 @@ function GroupSection({
             </td>
             <td className="px-2 py-1">
               <div className="flex gap-1 justify-end">
-                <button onClick={startEdit} className="text-muted-foreground hover:text-foreground">
+                <button onClick={startEdit} className="text-muted-foreground hover:text-foreground" aria-label="Bearbeiten">
                   <Pencil className="h-3 w-3" />
                 </button>
                 <button
                   onClick={() => { if (confirm(`Gruppe "${group.name}" löschen?`)) deleteGroup.mutate() }}
                   className="text-muted-foreground hover:text-destructive"
+                  aria-label="Löschen"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
@@ -241,6 +242,7 @@ function GroupSection({
             <button
               onClick={() => { if (confirm('Eintrag löschen?')) deleteEntry.mutate(entry.id) }}
               className="text-muted-foreground hover:text-destructive"
+              aria-label="Eintrag löschen"
             >
               <Trash2 className="h-3 w-3" />
             </button>
@@ -259,6 +261,7 @@ function GroupSection({
                 <button
                   onClick={() => setAddingEntry(true)}
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  aria-label="Eintrag hinzufügen"
                 >
                   <Plus className="h-3 w-3" /> Eintrag hinzufügen
                 </button>
@@ -357,8 +360,8 @@ function SubAccountPanel({ sub, accountId }: { sub: SubAccount; accountId: strin
                 className="border rounded px-2 py-1 text-sm w-28 text-right"
               />
             </label>
-            <Button size="sm" onClick={saveEdit}><Check className="h-3 w-3" /></Button>
-            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}><X className="h-3 w-3" /></Button>
+            <Button size="sm" onClick={saveEdit} aria-label="Speichern"><Check className="h-3 w-3" /></Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)} aria-label="Abbrechen"><X className="h-3 w-3" /></Button>
           </div>
         ) : (
           <div className="flex items-center justify-between px-4 py-2.5">
@@ -371,12 +374,13 @@ function SubAccountPanel({ sub, accountId }: { sub: SubAccount; accountId: strin
             </div>
             <div className="flex items-center gap-3">
               <span className={`font-bold text-sm ${balance < 0 ? 'text-destructive' : 'text-emerald-600'}`}>{fmt(balance)}</span>
-              <button onClick={startEdit} className="text-muted-foreground hover:text-foreground">
+              <button onClick={startEdit} className="text-muted-foreground hover:text-foreground" aria-label="Gruppe bearbeiten">
                 <Pencil className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => { if (confirm(`Unterkonto "${sub.name}" löschen?`)) deleteSub.mutate() }}
                 className="text-muted-foreground hover:text-destructive"
+                aria-label="Gruppe löschen"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -426,10 +430,10 @@ function SubAccountPanel({ sub, accountId }: { sub: SubAccount; accountId: strin
                       className="border rounded px-1 py-0.5 text-sm w-24 text-right"
                     />
                   </label>
-                  <Button size="sm" disabled={!newGroupName.trim()} onClick={() => addGroup.mutate()}>
+                  <Button size="sm" disabled={!newGroupName.trim()} onClick={() => addGroup.mutate()} aria-label="Speichern">
                     <Check className="h-3 w-3" />
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setAddingGroup(false)}>
+                  <Button size="sm" variant="ghost" onClick={() => setAddingGroup(false)} aria-label="Abbrechen">
                     <X className="h-3 w-3" />
                   </Button>
                 </span>
@@ -437,6 +441,7 @@ function SubAccountPanel({ sub, accountId }: { sub: SubAccount; accountId: strin
                 <button
                   onClick={() => setAddingGroup(true)}
                   className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  aria-label="Gruppe hinzufügen"
                 >
                   <Plus className="h-3 w-3" /> Gruppe hinzufügen
                 </button>

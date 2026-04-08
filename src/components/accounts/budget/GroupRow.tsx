@@ -72,6 +72,7 @@ function SortableCategoryRow({
     <div ref={setNodeRef} style={style} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/50 group/cat">
       <button
         className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground flex-shrink-0 touch-none"
+        aria-label="Ziehen zum Sortieren"
         {...attributes}
         {...listeners}
       >
@@ -88,12 +89,13 @@ function SortableCategoryRow({
         {typeLabels[cat.type]}
       </span>
       <div className="flex gap-0.5 opacity-0 group-hover/cat:opacity-100 transition-opacity">
-        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setEditingCat(cat.id)}>
+        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setEditingCat(cat.id)} aria-label="Kategorie bearbeiten">
           <Pencil className="h-2.5 w-2.5" />
         </Button>
         <Button
           variant="ghost" size="icon" className="h-5 w-5 text-destructive hover:text-destructive"
           onClick={() => onDelete(cat)}
+          aria-label="Kategorie löschen"
         >
           <Trash2 className="h-2.5 w-2.5" />
         </Button>
@@ -182,13 +184,14 @@ export function GroupRow({
       <div className="flex items-center gap-2 px-3 py-2 bg-muted/40">
         <button
           className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground flex-shrink-0 touch-none"
+          aria-label="Ziehen zum Sortieren"
           {...dragAttributes}
           {...dragListeners}
         >
           <GripVertical className="h-3.5 w-3.5" />
         </button>
 
-        <button onClick={() => setExpanded(e => !e)} className="flex items-center gap-1 flex-1 text-left">
+        <button onClick={() => setExpanded(e => !e)} className="flex items-center gap-1 flex-1 text-left" aria-label="Gruppe ein-/ausklappen">
           {expanded
             ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
             : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
@@ -210,15 +213,15 @@ export function GroupRow({
 
         {!editingGroup && (
           <div className="flex items-center gap-0.5">
-            <Button variant="ghost" size="icon" className="h-6 w-6" title="Kategorie hinzufügen"
+            <Button variant="ghost" size="icon" className="h-6 w-6" title="Kategorie hinzufügen" aria-label="Kategorie hinzufügen"
               onClick={() => { setAddingCat(true); setExpanded(true) }}>
               <Plus className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" title="Gruppe umbenennen"
+            <Button variant="ghost" size="icon" className="h-6 w-6" title="Gruppe umbenennen" aria-label="Gruppe umbenennen"
               onClick={() => setEditingGroup(true)}>
               <Pencil className="h-3 w-3" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" title="Gruppe löschen"
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" title="Gruppe löschen" aria-label="Gruppe löschen"
               onClick={() => onDeleteGroup(group.id, group.name)}>
               <Trash2 className="h-3 w-3" />
             </Button>

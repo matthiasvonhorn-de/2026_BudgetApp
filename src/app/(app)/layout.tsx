@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/layout/Sidebar'
 import { SettingsLoader } from '@/components/layout/SettingsLoader'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,7 +8,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SettingsLoader />
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
-        {children}
+        <ErrorBoundary>{children}</ErrorBoundary>
       </main>
     </div>
   )

@@ -3,6 +3,10 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: [
+    'savings/**/*.spec.ts',
+    'a11y/**/*.spec.ts',
+  ],
   timeout: 30_000,
   retries: 0,
   workers: 1,
