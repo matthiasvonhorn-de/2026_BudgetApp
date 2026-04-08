@@ -50,7 +50,7 @@ export default function AssetsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('Gesamt')
 
-  const { data: assets = [], isLoading } = useQuery<AssetListItem[]>({
+  const { data: assets = [], isLoading, isError } = useQuery<AssetListItem[]>({
     queryKey: ['assets'],
     queryFn: () => fetch('/api/assets').then(r => r.json()),
   })
@@ -70,6 +70,14 @@ export default function AssetsPage() {
 
   const activeMonths = TIME_FILTERS.find(f => f.label === timeFilter)?.months ?? 0
   const chartData = buildAggregateChart(assets, activeMonths)
+
+  if (isError) {
+    return (
+      <div className="p-6">
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

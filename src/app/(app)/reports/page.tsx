@@ -121,7 +121,7 @@ export default function ReportsPage() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
 
-  const { data: accounts = [] } = useQuery<Account[]>({
+  const { data: accounts = [], isError: isErrorAccounts } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
@@ -132,12 +132,12 @@ export default function ReportsPage() {
     [selectedAccountId, budgetAccounts],
   )
 
-  const { data: monthlySummary = [] } = useQuery<MonthlySummary[]>({
+  const { data: monthlySummary = [], isError: isErrorMonthlySummary } = useQuery<MonthlySummary[]>({
     queryKey: ['reports-monthly-summary'],
     queryFn: () => fetch('/api/reports/monthly-summary?months=12').then(r => r.json()),
   })
 
-  const { data: groupSpendingData } = useQuery<GroupSpendingData>({
+  const { data: groupSpendingData, isError: isErrorGroupSpending } = useQuery<GroupSpendingData>({
     queryKey: ['reports-group-spending', selectedYear, selectedMonth, effectiveAccountId],
     queryFn: () => fetch(`/api/reports/category-spending?year=${selectedYear}&month=${selectedMonth}&accountId=${effectiveAccountId}`).then(r => r.json()),
     enabled: !!effectiveAccountId,
@@ -145,12 +145,12 @@ export default function ReportsPage() {
   const groupExpenses = groupSpendingData?.expenses ?? []
   const groupIncome = groupSpendingData?.income ?? []
 
-  const { data: budgetData } = useQuery<BudgetData>({
+  const { data: budgetData, isError: isErrorBudget } = useQuery<BudgetData>({
     queryKey: ['budget', selectedYear, selectedMonth],
     queryFn: () => fetch(`/api/budget/${selectedYear}/${selectedMonth}`).then(r => r.json()),
   })
 
-  const { data: accountBalance = [] } = useQuery<AccountBalanceMonth[]>({
+  const { data: accountBalance = [], isError: isErrorAccountBalance } = useQuery<AccountBalanceMonth[]>({
     queryKey: ['reports-account-balance', effectiveAccountId],
     queryFn: () => fetch(`/api/reports/account-balance?accountId=${effectiveAccountId}&months=12`).then(r => r.json()),
     enabled: !!effectiveAccountId,
@@ -236,7 +236,9 @@ export default function ReportsPage() {
             />
           </div>
 
-          {balanceChartData.length === 0 ? (
+          {isErrorAccountBalance ? (
+            <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+          ) : balanceChartData.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 Keine Daten für dieses Konto
@@ -287,6 +289,9 @@ export default function ReportsPage() {
 
         {/* Tab 1: Gesamtübersicht */}
         <TabsContent value="gesamtübersicht" className="space-y-6">
+          {(isErrorAccounts || isErrorMonthlySummary) ? (
+            <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+          ) : <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="pb-2">
@@ -354,6 +359,7 @@ export default function ReportsPage() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+          </>}
         </TabsContent>
 
         {/* Tab 2: Gruppenanalyse */}
@@ -376,7 +382,9 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {groupExpenses.length === 0 && groupIncome.length === 0 ? (
+          {isErrorGroupSpending ? (
+            <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+          ) : groupExpenses.length === 0 && groupIncome.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 Keine Daten für diesen Monat
@@ -539,7 +547,9 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {budgetVsActualExpense.length === 0 && budgetVsActualIncome.length === 0 ? (
+          {isErrorBudget ? (
+            <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+          ) : budgetVsActualExpense.length === 0 && budgetVsActualIncome.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 Keine Budgetdaten für diesen Monat

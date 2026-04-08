@@ -15,10 +15,18 @@ const TYPE_LABELS: Record<string, string> = {
 export default function LoansPage() {
   const fmt = useFormatCurrency()
 
-  const { data: loans = [], isLoading } = useQuery({
+  const { data: loans = [], isLoading, isError } = useQuery({
     queryKey: ['loans'],
     queryFn: () => fetch('/api/loans').then(r => r.json()),
   })
+
+  if (isError) {
+    return (
+      <div className="p-6">
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

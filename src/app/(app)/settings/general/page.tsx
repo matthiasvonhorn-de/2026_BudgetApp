@@ -82,7 +82,7 @@ export default function GeneralSettingsPage() {
   const sensors = useSensors(useSensor(PointerSensor))
   const [accountDialog, setAccountDialog] = useState<{ open: boolean; account?: Account }>({ open: false })
 
-  const { data: accounts = [], isLoading } = useQuery({
+  const { data: accounts = [], isLoading, isError } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
@@ -131,7 +131,9 @@ export default function GeneralSettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {isLoading ? (
+          {isError ? (
+            <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+          ) : isLoading ? (
             <p className="text-sm text-muted-foreground">Laden...</p>
           ) : accounts.length === 0 ? (
             <p className="text-sm text-muted-foreground">Noch keine Konten angelegt.</p>

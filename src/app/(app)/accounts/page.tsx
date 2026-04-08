@@ -13,7 +13,7 @@ export default function AccountsPage() {
   const fmt = useFormatCurrency()
   const sensors = useSensors(useSensor(PointerSensor))
 
-  const { data: accounts = [], isLoading } = useQuery({
+  const { data: accounts = [], isLoading, isError } = useQuery({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
@@ -52,7 +52,9 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      ) : isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />

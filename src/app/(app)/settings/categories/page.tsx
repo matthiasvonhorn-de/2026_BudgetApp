@@ -14,7 +14,7 @@ interface Account {
 export default function CategoriesSettingsPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
 
-  const { data: accounts = [] } = useQuery<Account[]>({
+  const { data: accounts = [], isError } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: () => fetch('/api/accounts').then(r => r.json()),
   })
@@ -54,7 +54,9 @@ export default function CategoriesSettingsPage() {
         </Select>
       </div>
 
-      {accountId ? (
+      {isError ? (
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      ) : accountId ? (
         <CategoryGroupManagerContent accountId={accountId} />
       ) : (
         <p className="text-sm text-muted-foreground">Kein Konto vorhanden.</p>

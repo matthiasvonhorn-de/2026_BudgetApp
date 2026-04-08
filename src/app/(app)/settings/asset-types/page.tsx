@@ -19,7 +19,7 @@ export default function AssetTypesSettingsPage() {
   const openEdit = (t: AssetType) => { setEditType(t); setDialogOpen(true) }
   const closeDialog = () => { setDialogOpen(false); setEditType(null) }
 
-  const { data: types = [], isLoading } = useQuery<AssetType[]>({
+  const { data: types = [], isLoading, isError } = useQuery<AssetType[]>({
     queryKey: ['asset-types'],
     queryFn: () => fetch('/api/asset-types').then(r => r.json()),
   })
@@ -55,7 +55,9 @@ export default function AssetTypesSettingsPage() {
         </Button>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      ) : isLoading ? (
         <p className="text-muted-foreground">Laden...</p>
       ) : types.length === 0 ? (
         <div className="rounded-lg border p-8 text-center text-muted-foreground">

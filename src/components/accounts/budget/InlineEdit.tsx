@@ -30,10 +30,10 @@ export function InlineEdit({
           if (e.key === 'Escape') onCancel()
         }}
       />
-      <Button size="icon" variant="ghost" className="h-7 w-7 flex-shrink-0" onClick={() => val.trim() && onSave(val.trim())}>
+      <Button size="icon" variant="ghost" className="h-7 w-7 flex-shrink-0" onClick={() => val.trim() && onSave(val.trim())} aria-label="Bestätigen">
         <Check className="h-3.5 w-3.5 text-emerald-600" />
       </Button>
-      <Button size="icon" variant="ghost" className="h-7 w-7 flex-shrink-0" onClick={onCancel}>
+      <Button size="icon" variant="ghost" className="h-7 w-7 flex-shrink-0" onClick={onCancel} aria-label="Abbrechen">
         <X className="h-3.5 w-3.5 text-destructive" />
       </Button>
     </div>

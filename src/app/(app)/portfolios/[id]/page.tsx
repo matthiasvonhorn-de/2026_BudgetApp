@@ -56,7 +56,7 @@ export default function PortfolioDetailPage() {
   const [addRow, setAddRow] = useState<AddRowState | null>(null)
   const [editRow, setEditRow] = useState<EditRowState | null>(null)
 
-  const { data: portfolio, isLoading } = useQuery<PortfolioDetail>({
+  const { data: portfolio, isLoading, isError } = useQuery<PortfolioDetail>({
     queryKey: ['portfolios', id],
     queryFn: () => fetch(`/api/portfolios/${id}`).then(r => r.json()),
   })
@@ -109,6 +109,14 @@ export default function PortfolioDetailPage() {
     },
     onError: () => toast.error('Fehler beim Löschen'),
   })
+
+  if (isError) {
+    return (
+      <div className="p-6">
+        <div className="text-sm text-destructive p-4">Fehler beim Laden der Daten</div>
+      </div>
+    )
+  }
 
   if (isLoading || !portfolio) {
     return (
