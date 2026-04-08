@@ -6,6 +6,9 @@ export default defineConfig({
   testMatch: [
     'savings/**/*.spec.ts',
     'a11y/**/*.spec.ts',
+    'accounts/**/*.spec.ts',
+    'transactions/**/*.spec.ts',
+    'budget/**/*.spec.ts',
   ],
   timeout: 30_000,
   retries: 0,
