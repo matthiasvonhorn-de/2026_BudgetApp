@@ -78,7 +78,11 @@ describe('GET /api/budget/[year]/[month]', () => {
     expect(lebensmittel.activity).toBe(-120)
   })
 
-  it('calculates totalIncome from INCOME transactions', async () => {
+  it('calculates totalIncome from INCOME transactions on budgeted accounts', async () => {
+    // Income only counts if the account has at least one budget entry for the month
+    await prisma.budgetEntry.create({
+      data: { categoryId: SEED.categories.miete, month: 4, year: 2026, budgeted: 800 },
+    })
     await prisma.transaction.create({
       data: {
         date: new Date('2026-04-01'),
@@ -96,6 +100,26 @@ describe('GET /api/budget/[year]/[month]', () => {
     )
     const data = await res.json()
     expect(data.summary.totalIncome).toBe(3000)
+  })
+
+  it('excludes income from accounts without budget entries', async () => {
+    await prisma.transaction.create({
+      data: {
+        date: new Date('2026-04-01'),
+        mainAmount: 3000,
+        mainType: 'INCOME',
+        description: 'Gehalt',
+        accountId: SEED.accounts.girokonto,
+        categoryId: SEED.categories.gehalt,
+        status: 'CLEARED',
+      },
+    })
+    const res = await GET(
+      createRequest('GET', '/api/budget/2026/4'),
+      budgetParams(2026, 4),
+    )
+    const data = await res.json()
+    expect(data.summary.totalIncome).toBe(0)
   })
 
   it('returns zero summary for month without data', async () => {

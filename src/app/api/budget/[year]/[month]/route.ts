@@ -44,7 +44,7 @@ export const GET = withHandler(async (_, ctx) => {
   `
   const activityMap = new Map(activityRows.map(a => [a.categoryId, a.total]))
 
-  // Gesamteinnahmen dieses Monats (für readyToAssign): SUM(mainAmount) where mainType = INCOME
+  // Gesamteinnahmen dieses Monats (für readyToAssign): nur von Konten mit Budgetplanung
   const incomeRows = await prisma.$queryRaw<[{ total: number | null }]>`
     SELECT SUM(COALESCE(t.mainAmount, 0)) as total
     FROM "Transaction" t
@@ -55,6 +55,14 @@ export const GET = withHandler(async (_, ctx) => {
       AND t.mainType = 'INCOME'
       AND a.isActive = 1
       AND a.type NOT IN ('SPARPLAN', 'FESTGELD')
+      AND EXISTS (
+        SELECT 1 FROM BudgetEntry be
+        JOIN Category c ON be.categoryId = c.id
+        JOIN CategoryGroup cg ON c.groupId = cg.id
+        WHERE cg.accountId = a.id
+          AND be.month = ${month}
+          AND be.year = ${year}
+      )
   `
   const totalIncome = incomeRows[0]?.total ?? 0
 
